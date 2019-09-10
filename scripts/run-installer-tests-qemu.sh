@@ -4,64 +4,60 @@ usage() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-	echo "${script_name} - Run Fedora install test in QEMU." >&2
+	echo "${script_name} - Run Linux installer tests in QEMU." >&2
 	echo "Usage: ${script_name} [flags]" >&2
-	echo "Option flags:" >&2
-	echo "  -a --arch           - Target architecture. Default: '${target_arch}'." >&2
-	echo "  -c --kernel-cmd     - Kernel command line options. Default: '${kernel_cmd}'." >&2
-	echo "  -f --hostfwd-offset - QEMU hostfwd port offset. Default: '${hostfwd_offset}'." >&2
-	echo "  -h --help           - Show this help and exit." >&2
-	echo "  -o --out-file       - stdout, stderr redirection file. Default: '${out_file}'." >&2
-	echo "  -s --systemd-debug  - Run systemd with debug options. Default: '${systemd_debug}'." >&2
-	echo "  -v --verbose        - Verbose execution." >&2
-	echo "  --hda               - QEMU IDE hard disk image hda. Default: '${hda}'." >&2
-	echo "  --initrd            - Initrd image. Default: '${initrd}'." >&2
-	echo "  --kickstart         - Fedora kickstart file. Default: '${kickstart}'." >&2
-	echo "  --kernel            - Kernel image. Default: '${kernel}'." >&2
-	echo "  --result-file       - Result file. Default: '${result_file}'." >&2
-	echo "  --ssh-key           - SSH private key file. Default: '${ssh_key}'." >&2
+	echo "Option flags general:" >&2
+	echo "  -h --help        - Show this help and exit." >&2
+	echo "  -v --verbose     - Verbose execution." >&2
+
+	echo "  --arch           - Target architecture. Default: '${target_arch}'." >&2
+	echo "  --hda            - QEMU IDE hard disk image hda. Default: '${hda}'." >&2
+	echo "  --hostfwd-offset - QEMU hostfwd port offset. Default: '${hostfwd_offset}'." >&2
+	echo "  --out-file       - stdout, stderr redirection file. Default: '${out_file}'." >&2
+	echo "  --result-file    - Result file. Default: '${result_file}'." >&2
+	echo "  --ssh-key        - SSH private key file. Default: '${ssh_key}'." >&2
+	echo "  --systemd-debug  - Run systemd with debug options. Default: '${systemd_debug}'." >&2
+
+	echo "Option flags for installer:" >&2
+	echo "  --distro         - Linux distribution type: {$(clean_ws ${known_distro_types})}. Default: '${distro}'." >&2
+	echo "  --control-file   - Installer automated control file (preseed, kickstart, autoinst.xml). Default: '${control_file}'." >&2
+	echo "  --kernel         - Installer kernel image. Default: '${kernel}'." >&2
+	echo "  --kernel-cmd     - Installer kernel command line options. Default: '${kernel_cmd}'." >&2
+	echo "  --initrd         - Installer initrd image. Default: '${initrd}'." >&2
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="a:c:f:ho:sv"
-	local long_opts="arch:,kernel-cmd:,hostfwd-offset:,help,out-file:,systemd-debug,\
-verbose,hda:,initrd:,kickstart:,kernel:,result-file:,ssh-key:"
+	local short_opts="hv"
+	local long_opts="\
+help,\
+verbose,\
+\
+arch:,\
+hda:,\
+hostfwd-offset:,\
+out-file:,\
+result-file:,\
+ssh-key:,\
+systemd-debug,\
+\
+distro:,\
+control-file:,\
+kernel:,\
+kernel-cmd:,\
+initrd:,\
+"
 
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
 
-	if [ $? != 0 ]; then
-		echo "${script_name}: ERROR: Internal getopt" >&2
-		exit 1
-	fi
-
 	eval set -- "${opts}"
 
 	while true ; do
+		#Secho "${FUNCNAME[0]}: @${1}@ @${2}@"
 		case "${1}" in
-		-a | --arch)
-			target_arch=$(get_arch "${2}")
-			shift 2
-			;;
-		-c | --kernel-cmd)
-			kernel_cmd="${2}"
-			shift 2
-			;;
-		-f | --hostfwd-offset)
-			hostfwd_offset="${2}"
-			shift 2
-			;;
 		-h | --help)
 			usage=1
-			shift
-			;;
-		-o | --out-file)
-			out_file="${2}"
-			shift 2
-			;;
-		-s | --systemd-debug)
-			systemd_debug=1
 			shift
 			;;
 		-v | --verbose)
@@ -69,20 +65,21 @@ verbose,hda:,initrd:,kickstart:,kernel:,result-file:,ssh-key:"
 			verbose=1
 			shift
 			;;
+
+		--arch)
+			target_arch=$(get_arch "${2}")
+			shift 2
+			;;
 		--hda)
 			hda="${2}"
 			shift 2
 			;;
-		--initrd)
-			initrd="${2}"
+		--hostfwd-offset)
+			hostfwd_offset="${2}"
 			shift 2
 			;;
-		--kickstart)
-			kickstart="${2}"
-			shift 2
-			;;
-		--kernel)
-			kernel="${2}"
+		--out-file)
+			out_file="${2}"
 			shift 2
 			;;
 		--result_file)
@@ -93,8 +90,38 @@ verbose,hda:,initrd:,kickstart:,kernel:,result-file:,ssh-key:"
 			ssh_key="${2}"
 			shift 2
 			;;
+		--systemd-debug)
+			systemd_debug=1
+			shift
+			;;
+
+		--distro)
+			distro="${2}"
+			shift 2
+			;;
+		--control-file)
+			control_file="${2}"
+			shift 2
+			;;
+		--kernel)
+			kernel="${2}"
+			shift 2
+			;;
+		--initrd)
+			initrd="${2}"
+			shift 2
+			;;
+		--kernel-cmd)
+			kernel_cmd="${2}"
+			shift 2
+			;;
 		--)
 			shift
+			if [[ ${1} ]]; then
+				echo "${script_name}: ERROR: Found extra opts: '${@}'" >&2
+				usage
+				exit 1
+			fi
 			break
 			;;
 		*)
@@ -123,15 +150,15 @@ on_exit() {
 		qemu_pid=''
 	fi
 
-	if [[ -d ${ks_mnt} ]]; then
-		sudo umount ${ks_mnt} || :
-		rm -rf ${ks_mnt} || :
-		ks_mnt=''
+	if [[ -d ${installer_extra_mnt} ]]; then
+		sudo umount ${installer_extra_mnt} || :
+		rm -rf ${installer_extra_mnt} || :
+		unset installer_extra_mnt
 	fi
 	
-	if [[ -f "${ks_img}" ]]; then
-		rm -f ${ks_img}
-		ks_img=''
+	if [[ -f "${installer_extra_img}" ]]; then
+		rm -f ${installer_extra_img}
+		unset installer_extra_img
 	fi
 
 	if [[ -d ${tmp_dir} ]]; then
@@ -141,76 +168,109 @@ on_exit() {
 	echo "${script_name}: ${result}" >&2
 }
 
-make_kickstart_img() {
-	ks_img="$(mktemp --tmpdir tdd-ks-img.XXXX)"
-	ks_mnt="$(mktemp --tmpdir --directory tdd-ks-mnt.XXXX)"
+make_installer_extra_img() {
+	installer_extra_img="$(mktemp --tmpdir installer_extra_img.XXXX)"
+	installer_extra_mnt="$(mktemp --tmpdir --directory installer_extra_mnt.XXXX)"
 
-	local ks_file
-	ks_file="${ks_mnt}/${kickstart##*/}"
+	local installer_extra_file
+	installer_extra_file="${installer_extra_mnt}/${control_file##*/}"
 
-	dd if=/dev/zero of=${ks_img} bs=1M count=1
-	mkfs.vfat ${ks_img}
+	dd if=/dev/zero of="${installer_extra_img}" bs=1M count=1
+	mkfs.vfat "${installer_extra_img}"
 
-	sudo mount -o rw,uid=$(id -u),gid=$(id -g) ${ks_img} ${ks_mnt}
+	sudo mount -o rw,uid=$(id -u),gid=$(id -g) "${installer_extra_img}" "${installer_extra_mnt}"
 
-	cp -v ${kickstart} ${ks_file}
+	cp -v "${control_file}" "${installer_extra_file}"
 
-	if [[ -n "${ssh_key}" ]]; then
-		sed --in-place "s|@@ssh-keys@@|$(cat ${ssh_key}.pub)|" ${ks_file}
+	if [[ ${ssh_key} ]]; then
+		sed --in-place "s|@@ssh-keys@@|$(cat ${ssh_key}.pub)|" "${installer_extra_file}"
 	fi
 
-	echo '' >> ${result_file}
-	echo '---------' >> ${result_file}
-	echo 'kickstart' >> ${result_file}
-	echo '---------' >> ${result_file}
-	cat ${ks_file} >> ${result_file}
-	echo '---------' >> ${result_file}
+	{
+		echo ''
+		echo '---------'
+		echo 'control_file'
+		echo '---------'
+		cat ""${control_file}""
+		echo '---------'
+	} >> "${result_file}"
 
-	sudo umount ${ks_mnt}
-	rmdir ${ks_mnt}
-	ks_mnt=''
+	sudo umount "${installer_extra_mnt}"
+	rmdir -v "${installer_extra_mnt}"
+	unset installer_extra_mnt
 }
 
-start_qemu_kernel() {
+start_qemu_with_kernel() {
 	local out_file=${1}
 
 	ssh_fwd=$(( ${hostfwd_offset} + 22 ))
 
-	echo "${script_name}: ssh_fwd port = ${ssh_fwd}" >&2
+	echo "${script_name}: SSH fwd port = ${ssh_fwd}" >&2
 
 	${SCRIPTS_TOP}/start-qemu.sh \
 		--verbose \
 		--arch="${target_arch}" \
 		--hostfwd-offset="${hostfwd_offset}" \
-		--hda="${hda}" \
 		--out-file="${out_file}" \
 		--pid-file="${qemu_pid_file}" \
-		--hdb="${ks_img}" \
-		--initrd="${initrd}" \
 		--kernel="${kernel}" \
 		--kernel-cmd="${kernel_cmd}" \
-		${start_extra_args} \
-		</dev/null &> "${out_file}" &
+		--initrd="${initrd}" \
+		--hda="${hda}" \
+		--hdb="${installer_extra_img}" \
+		${systemd_debug:+--systemd-debug} \
+		</dev/null &>> "${out_file}" &
 }
 
-
-start_qemu_hda() {
+start_qemu_with_hda() {
 	local out_file=${1}
 
         ssh_fwd=$(( ${hostfwd_offset} + 22 ))
 
-	echo "${script_name}: ssh_fwd port = ${ssh_fwd}" >&2
+	echo "${script_name}: SSH fwd port = ${ssh_fwd}" >&2
 
         ${SCRIPTS_TOP}/start-qemu.sh \
                 --verbose \
                 --arch="${target_arch}" \
                 --hostfwd-offset="${hostfwd_offset}" \
-                --hda="${hda}" \
                 --out-file="${out_file}" \
                 --pid-file="${qemu_pid_file}" \
                 --hda-boot \
-                ${start_extra_args} \
-                </dev/null &> "${out_file}" &
+                --hda="${hda}" \
+		${systemd_debug:+--systemd-debug} \
+                </dev/null &>> "${out_file}" &
+}
+
+wait_for_qemu_start () {
+	local stage_name=${1}
+	local stage_wait=${2}\
+	local start_time=${SECONDS}
+
+	echo "${script_name}: Waiting for ${stage_name} QEMU startup..." >&2
+	sleep ${stage_wait}
+
+	{
+		echo "vvvv ${stage_name} startup vvvv"
+		cat "${out_file}.start-${stage_name}"
+		echo '---------------------------'
+		ps aux
+		echo "^^^^ ${stage_name} startup ^^^^"
+	} >&2
+
+	if [[ ! -f ${qemu_pid_file} ]]; then
+		echo "${script_name}: ERROR: ${stage_name} QEMU seems to have quit early (no pid file)." >&2
+		exit 1
+	fi
+
+	qemu_pid=$(cat ${qemu_pid_file})
+
+	if ! kill -0 ${qemu_pid} &> /dev/null; then
+		echo "${script_name}: ERROR: ${stage_name} QEMU seems to have quit early (no pid)." >&2
+		exit 1
+	fi
+
+	local duration=$((SECONDS - start_time))
+	echo "${script_name}: ${stage_name} boot time: ${duration} sec ($(sec_to_min ${duration}) min)" >&2
 }
 
 #===============================================================================
@@ -227,13 +287,22 @@ source ${SCRIPTS_TOP}/lib/relay.sh
 
 host_arch=$(get_arch "$(uname -m)")
 
+known_distro_types="
+	debian
+	fedora
+	opensuse
+	sle
+	ubuntu
+"
+
 process_opts "${@}"
 
 target_arch=${target_arch:-"${host_arch}"}
 hostfwd_offset=${hostfwd_offset:-"20000"}
 
-if [[ -n "${usage}" ]]; then
+if [[ "${usage}" ]]; then
 	usage
+	trap - EXIT
 	exit 0
 fi
 
@@ -241,6 +310,11 @@ if [[ "${target_arch}" != "arm64" ]]; then
 	echo "${script_name}: ERROR: Unsupported target arch '${target_arch}'." >&2
 	exit 1
 fi
+
+check_opt 'distro' ${distro}
+
+check_opt 'control_file' ${control_file}
+check_file "${control_file}"
 
 check_opt 'kernel' ${kernel}
 check_file "${kernel}"
@@ -251,11 +325,25 @@ check_file "${initrd}"
 check_opt 'hda' ${hda}
 check_file "${hda}"
 
-check_opt 'kickstart' ${kickstart}
-check_file "${kickstart}"
-
-inst_repo="$(egrep '^url[[:space:]]*--url=' ${kickstart} | cut -d '=' -f 2 | sed 's/"//g')"
-kernel_cmd="inst.text inst.repo=${inst_repo} inst.ks=hd:vdb:${kickstart##*/} ${kernel_cmd}"
+case "${distro}" in
+fedora)
+	inst_repo="$(egrep '^url[[:space:]]*--url=' ${control_file} | cut -d '=' -f 2 | sed 's/"//g')"
+	kernel_cmd+=" inst.text inst.repo=${inst_repo} inst.ks=hd:vdb:${control_file##*/}"
+	;;
+opensuse)
+	kernel_cmd+=" autoyast=device://vdb/${control_file##*/}"
+	;;
+	
+debian | sle | ubuntu)
+	echo "${name}: ERROR, TODO: No Support yet '${distro}'" >&2
+	exit 1
+	;;
+*)
+	echo "${name}: ERROR: Unknown distro type '${distro}'" >&2
+	usage
+	exit 1
+	;;
+esac
 
 if [[ ! ${out_file} ]]; then
 	out_file="${script_name}-out.txt"
@@ -269,88 +357,45 @@ if [[ ${ssh_key} ]]; then
 	check_file ${ssh_key} " ssh-key" "usage"
 fi
 
-start_extra_args=''
-
-if [[ ${systemd_debug} ]]; then
-	start_extra_args+=' --systemd-debug'
-fi
-
 rm -f ${out_file} ${out_file}.start ${result_file}
+
+{
+	echo '--------'
+	echo 'printenv'
+	echo '--------'
+	printenv
+	echo '---------'
+} >> ${result_file}
 
 tmp_dir="$(mktemp --tmpdir --directory ${script_name}.XXXX)"
 
-echo '--------' >> ${result_file}
-echo 'printenv' >> ${result_file}
-echo '--------' >> ${result_file}
-printenv        >> ${result_file}
-echo '---------' >> ${result_file}
-
-make_kickstart_img
+make_installer_extra_img
 
 qemu_pid_file=${tmp_dir}/qemu-pid
 
 SECONDS=0
 
-start_qemu_kernel ${out_file}.start
+stage_name="installer"
 
-echo "${script_name}: Waiting for QEMU startup..." >&2
-sleep 10s
+start_qemu_with_kernel "${out_file}.start-${stage_name}"
+wait_for_qemu_start "${stage_name}" 120
 
-echo '---- start-qemu start install ----' >&2
-cat ${out_file}.start >&2
-echo '---- start-qemu end install ----' >&2
+echo "${script_name}: Waiting for ${stage_name} QEMU exit..." >&2
+wait_pid ${qemu_pid} 3600
 
-ps aux
+stage_name="first-boot"
 
-if [[ ! -f ${qemu_pid_file} ]]; then
-	echo "${script_name}: ERROR: QEMU seems to have quit early (pid file)." >&2
-	exit 1
-fi
-
-qemu_pid=$(cat ${qemu_pid_file})
-
-if ! kill -0 ${qemu_pid} &> /dev/null; then
-	echo "${script_name}: ERROR: QEMU seems to have quit early (pid)." >&2
-	exit 1
-fi
-
-echo "${script_name}: Waiting for QEMU exit..." >&2
-wait_pid ${qemu_pid} 5100
-
-
-start_qemu_hda ${out_file}.start
-
-echo "${script_name}: Waiting for QEMU startup..." >&2
-sleep 180s
-
-echo '---- start-qemu start boot ----' >&2
-cat ${out_file}.start >&2
-echo '---- start-qemu end boot ----' >&2
-
-ps aux
-
-if [[ ! -f ${qemu_pid_file} ]]; then
-        echo "${script_name}: ERROR: QEMU seems to have quit early (pid file)." >&2
-        exit 1
-fi
-
-qemu_pid=$(cat ${qemu_pid_file})
-
-if ! kill -0 ${qemu_pid} &> /dev/null; then
-        echo "${script_name}: ERROR: QEMU seems to have quit early (pid)." >&2
-        exit 1
-fi
+start_qemu_with_hda "${out_file}.start-${stage_name}"
+wait_for_qemu_start "${stage_name}" 120
 
 user_qemu_host="root@localhost"
-
 user_qemu_ssh_opts="-o Port=${ssh_fwd}"
-
 ssh_no_check="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 ssh ${ssh_no_check} -i ${ssh_key} ${user_qemu_ssh_opts} ${user_qemu_host} \
         '/sbin/poweroff &'
 
-echo "${script_name}: Waiting for QEMU exit..." >&2
+echo "${script_name}: Waiting for ${stage_name} QEMU exit..." >&2
 wait_pid ${qemu_pid} 180
 
 echo "${script_name}: Boot time: $(sec_to_min ${SECONDS}) min" >&2
