@@ -10,9 +10,9 @@
 
 final String REPO_URL = 'https://github.com/glevand/tdd-project.git'
 final String REPO_JOB_PATH = 'jenkins/jobs'
-final String REPO_BRANCH = 'master'
-final String BASE_FOLDER = 'tdd'
-
+final String REPO_BRANCH = 'dev'
+final String BASE_FOLDER = 'tdd-dev'
+\
 /*
  * Create a new folder project under the given parent model.
  */
