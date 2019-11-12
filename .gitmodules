@@ -1,3 +1,6 @@
 [submodule "ipxe"]
 	path = ipxe
 	url = https://github.com/glevand/tdd--ipxe.git
+[submodule "relay"]
+	path = relay
+	url = https://github.com/glevand/tdd--relay-server.git
