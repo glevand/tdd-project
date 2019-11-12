@@ -7,3 +7,6 @@
 [submodule "docker"]
 	path = docker
 	url = https://github.com/glevand/tdd--docker.git
+[submodule "scripts/tdd-lib"]
+	path = scripts/tdd-lib
+	url = https://github.com/glevand/tdd--script-lib.git
