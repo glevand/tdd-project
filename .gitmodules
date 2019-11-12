@@ -4,3 +4,6 @@
 [submodule "relay"]
 	path = relay
 	url = https://github.com/glevand/tdd--relay-server.git
+[submodule "docker"]
+	path = docker
+	url = https://github.com/glevand/tdd--docker.git
