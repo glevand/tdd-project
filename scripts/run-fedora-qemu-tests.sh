@@ -171,24 +171,46 @@ make_kickstart_img() {
 	ks_mnt=''
 }
 
-start_qemu_user_networking() {
+start_qemu_kernel() {
+	local out_file=${1}
+
 	ssh_fwd=$(( ${hostfwd_offset} + 22 ))
 
 	echo "${script_name}: ssh_fwd port = ${ssh_fwd}" >&2
 
 	${SCRIPTS_TOP}/start-qemu.sh \
+		--verbose \
 		--arch="${target_arch}" \
-		--kernel-cmd="${kernel_cmd}" \
 		--hostfwd-offset="${hostfwd_offset}" \
-		--initrd="${initrd}" \
-		--kernel="${kernel}" \
 		--hda="${hda}" \
-		--hdb="${ks_img}" \
 		--out-file="${out_file}" \
 		--pid-file="${qemu_pid_file}" \
-		--verbose \
+		--hdb="${ks_img}" \
+		--initrd="${initrd}" \
+		--kernel="${kernel}" \
+		--kernel-cmd="${kernel_cmd}" \
 		${start_extra_args} \
-		</dev/null &> "${out_file}.start" &
+		</dev/null &> "${out_file}" &
+}
+
+
+start_qemu_hda() {
+	local out_file=${1}
+
+        ssh_fwd=$(( ${hostfwd_offset} + 22 ))
+
+	echo "${script_name}: ssh_fwd port = ${ssh_fwd}" >&2
+
+        ${SCRIPTS_TOP}/start-qemu.sh \
+                --verbose \
+                --arch="${target_arch}" \
+                --hostfwd-offset="${hostfwd_offset}" \
+                --hda="${hda}" \
+                --out-file="${out_file}" \
+                --pid-file="${qemu_pid_file}" \
+                --hda-boot \
+                ${start_extra_args} \
+                </dev/null &> "${out_file}" &
 }
 
 #===============================================================================
@@ -200,10 +222,10 @@ SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
 trap "on_exit 'failed.'" EXIT
 set -e
 
-host_arch=$(get_arch "$(uname -m)")
-
 source ${SCRIPTS_TOP}/lib/util.sh
 source ${SCRIPTS_TOP}/lib/relay.sh
+
+host_arch=$(get_arch "$(uname -m)")
 
 process_opts "${@}"
 
@@ -268,14 +290,15 @@ make_kickstart_img
 qemu_pid_file=${tmp_dir}/qemu-pid
 
 SECONDS=0
-start_qemu_user_networking
+
+start_qemu_kernel ${out_file}.start
 
 echo "${script_name}: Waiting for QEMU startup..." >&2
 sleep 10s
 
-echo '---- start-qemu start ----' >&2
+echo '---- start-qemu start install ----' >&2
 cat ${out_file}.start >&2
-echo '---- start-qemu end ----' >&2
+echo '---- start-qemu end install ----' >&2
 
 ps aux
 
@@ -290,6 +313,42 @@ if ! kill -0 ${qemu_pid} &> /dev/null; then
 	echo "${script_name}: ERROR: QEMU seems to have quit early (pid)." >&2
 	exit 1
 fi
+
+echo "${script_name}: Waiting for QEMU exit..." >&2
+wait_pid ${qemu_pid} 5100
+
+
+start_qemu_hda ${out_file}.start
+
+echo "${script_name}: Waiting for QEMU startup..." >&2
+sleep 180s
+
+echo '---- start-qemu start boot ----' >&2
+cat ${out_file}.start >&2
+echo '---- start-qemu end boot ----' >&2
+
+ps aux
+
+if [[ ! -f ${qemu_pid_file} ]]; then
+        echo "${script_name}: ERROR: QEMU seems to have quit early (pid file)." >&2
+        exit 1
+fi
+
+qemu_pid=$(cat ${qemu_pid_file})
+
+if ! kill -0 ${qemu_pid} &> /dev/null; then
+        echo "${script_name}: ERROR: QEMU seems to have quit early (pid)." >&2
+        exit 1
+fi
+
+user_qemu_host="root@localhost"
+
+user_qemu_ssh_opts="-o Port=${ssh_fwd}"
+
+ssh_no_check="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+ssh ${ssh_no_check} -i ${ssh_key} ${user_qemu_ssh_opts} ${user_qemu_host} \
+        '/sbin/poweroff &'
 
 echo "${script_name}: Waiting for QEMU exit..." >&2
 wait_pid ${qemu_pid} 180
