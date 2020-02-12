@@ -3,7 +3,7 @@
 
 
 script {
-    library identifier: "tdd@master", retriever: legacySCM(scm)
+    library identifier: "tdd-project@master", retriever: legacySCM(scm)
 }
 
 String test_machine = 'gbt2s19'
@@ -40,6 +40,9 @@ pipeline {
         choice(name: 'TARGET_ARCH',
             choices: "arm64\namd64\nppc64le",
             description: 'Target architecture to build for.')
+        string(name: 'TEST_MACHINE',
+               defaultValue: 'gbt2s19',
+               description: 'test machine')
         string(name: 'PIPELINE_BRANCH',
                defaultValue: 'master',
                description: 'Branch to use for fetching the pipeline jobs')
@@ -79,10 +82,12 @@ fi")
             returnStdout: true,
             script: './docker/builder/build-builder.sh --tag').trim()
         String qemu_out = "qemu-console.txt"
-        String remote_out = test_machine + "-console.txt"
-        String tftp_initrd = 'tdd-initrd'
-        String tftp_kickstart = 'tdd-kickstart'
-        String tftp_kernel = 'tdd-kernel'
+        String remote_out = "${params.TEST_MACHINE}-console.txt"
+        String tftp_initrd = 'f_initrd'
+        String tftp_kickstart = 'f_kickstart'
+        String tftp_kernel = 'f_kernel'
+	String tftp_remote = 'tdd-jenkins@tdd1'
+	String tftp_qemu = 'localhost'
     }
 
     agent {
@@ -98,81 +103,14 @@ fi")
             }
         }
 
-        stage('parallel-setup') {
-            failFast false
-            parallel { /* parallel-setup */
+        stage('build-builder') {
+             steps { /* build-builder */
+                 tdd_print_debug_info("start")
+                 tdd_print_result_header()
 
-                stage('download-files') {
-                    steps { /* download-files */
-                        tdd_print_debug_info("start")
+                 echo "${STAGE_NAME}: dockerTag=@${env.dockerTag}@"
 
-                        copyArtifacts(
-                            projectName: "${JOB_NAME}",
-                            selector: lastCompleted(),
-                            fingerprintArtifacts: true,
-                            optional: true,
-                        )
-
-                        sh("""#!/bin/bash
-export PS4='+ [${STAGE_NAME}] \${BASH_SOURCE##*/}:\${LINENO}: '
-set -ex
-
-rm -f ${env.tftp_initrd} ${env.tftp_kickstart} ${env.tftp_kernel}
-
-if [[ -n "${params.FEDORA_KICKSTART_URL}" ]]; then
-    curl --silent --show-error --location ${params.FEDORA_KICKSTART_URL} > ${env.tftp_kickstart}
-else
-    cp jenkins/jobs/distro/fedora/f30-qemu.ks ${env.tftp_kickstart}
-fi
-curl --silent --show-error --location ${params.FEDORA_INITRD_URL} > ${env.tftp_initrd}
-curl --silent --show-error --location ${params.FEDORA_KERNEL_URL} > ${env.tftp_kernel}
-
-if [[ -f md5sum.txt ]]; then
-    last="\$(cat md5sum.txt)"
-fi
-
-current=\$(md5sum ${env.tftp_initrd} ${env.tftp_kernel})
-
-set +x
-echo '------'
-echo "last    = \n\${last}"
-echo "current = \n\${current}"
-ls -l ${env.tftp_initrd} ${env.tftp_kernel}
-echo '------'
-set -x
-
-if [[ "${params.FORCE}" == 'true' || -z "\${last}" \
-    || "\${current}" != "\${last}" ]]; then
-    echo "${STAGE_NAME}: Need test."
-    echo "\${current}" > md5sum.txt
-    echo "yes" > need-test
-else
-    echo "${STAGE_NAME}: No change."
-    echo "no" > need-test
-fi
-""")
-                }
-                post { /* download-files */
-                    success {
-                        archiveArtifacts(
-                            artifacts: "md5sum.txt",
-                            fingerprint: true
-                        )
-                    }
-                    cleanup {
-                        echo "${STAGE_NAME}: done: ${currentBuild.currentResult}"
-                    }
-                }
-            }
-
-            stage('build-builder') {
-                steps { /* build-builder */
-                        tdd_print_debug_info("start")
-                        tdd_print_result_header()
-
-                    echo "${STAGE_NAME}: dockerTag=@${env.dockerTag}@"
-
-                    sh("""#!/bin/bash -ex
+                 sh("""#!/bin/bash -ex
 export PS4='+ [${STAGE_NAME}] \${BASH_SOURCE##*/}:\${LINENO}: '
 
 tag=${env.dockerTag}
@@ -187,63 +125,80 @@ docker images \${tag%:*}
                 post { /* build-builder */
                     cleanup {
                         echo "${STAGE_NAME}: done: ${currentBuild.currentResult}"
-                    }
-                }
-            }
-        }
-    }
+                   }
+               }
+           }
 
-    stage('parallel-test') {
+        stage('parallel-test') {
             failFast false
+
+            environment {
+                NeedRemotetest = sh(
+                    returnStdout: true,
+                    script:"set +ex; \
+scripts/upload-fedora-installer.sh \
+    --host=${params.TEST_MACHINE} \
+    --tftp-server=${env.tftp_remotei} \
+    --verbose ; \
+result=\${?} ; \
+set -e ; \
+if [ \${result} -eq 0 ]; then \
+	echo -n 'yes'; \
+else \
+	echo -n 'no' ; \
+fi").trim()
+
+                 NeedQemutest = sh(
+                    returnStdout: true,
+                    script:"set +ex; \
+scripts/upload-fedora-installer.sh \
+    --host=qemu \
+    --tftp-server=${env.tftp_qemu} \
+    --verbose ; \
+result=\${?} ; \
+set -e ; \
+if [ \${result} -eq 0 ]; then \
+        echo -n 'yes'; \
+else \
+	echo -n 'no' ; \
+fi").trim()
+
+}
             parallel { /* parallel-test */
 
-                stage('remote-tests') {
-
-                    when {
-                        expression { return params.RUN_REMOTE_TESTS == true \
-                            && readFile('need-test').contains('yes')  }
-                    }
-
-                    stages { /* remote-tests */
-
-                        stage('upload-files') {
-                            steps {
-                                echo "${STAGE_NAME}: start"
-                                tdd_upload_tftp_files('tdd-tftp-login-key',
-                                    env.tftp_server, env.tftp_root,
-                                    env.tftp_initrd + ' ' + env.tftp_kernel + ' '
-                                        + env.tftp_kickstart)
+                 stage('run-remote-tests') {
+                     when {
+                        expression { return RUN_REMOTE_TESTS == true \
+                            &&  env.NeedRemotetest == 'yes'
                             }
-                        }
+                       }
 
-                        stage('run-remote-tests') {
-
-                            agent { /* run-remote-tests */
-                                docker {
-                                    image "${env.dockerTag}"
-                                    args "--network host \
-                                        ${env.dockerCredsExtra} \
-                                        ${env.dockerSshExtra} \
+                      agent { /* run-remote-tests */
+                      docker {
+                              image "${env.dockerTag}"
+                              args "--network host \
+                              ${env.dockerCredsExtra} \
+                              ${env.dockerSshExtra} \
                                     "
                                     reuseNode true
                                 }
                             }
 
-                            environment { /* run-remote-tests */
-                                TDD_BMC_CREDS = credentials("${test_machine}_bmc_creds")
-                            }
+                       environment { /* run-remote-tests */
+                            TDD_BMC_CREDS = credentials("${test_machine}_bmc_creds")
+                           }
 
-                            options { /* run-remote-tests */
-                                timeout(time: 90, unit: 'MINUTES')
-                            }
+                       options { /* run-remote-tests */
+                             timeout(time: 90, unit: 'MINUTES')
+                           }
 
-                            steps { /* run-remote-tests */
-                                echo "${STAGE_NAME}: start"
-                                tdd_print_debug_info("${STAGE_NAME}")
-                                tdd_print_result_header()
+                       steps { /* run-remote-tests */
+                              echo "${STAGE_NAME}: start"
+                              tdd_print_debug_info("${STAGE_NAME}")
+                              tdd_print_result_header()
 
-                                script {
-                                    sh("""#!/bin/bash -ex
+                              script {
+                                  sh("""#!/bin/bash -ex
 export PS4='+ [${STAGE_NAME}] \${BASH_SOURCE##*/}:\${LINENO}: '
 
 echo "--------"
@@ -256,22 +211,22 @@ echo "${STAGE_NAME}: TODO"
                                 }
                             }
 
-                            post { /* run-remote-tests */
-                                cleanup {
-                                    archiveArtifacts(
-                                        artifacts: "${STAGE_NAME}-result.txt, ${env.remote_out}",
-                                        fingerprint: true)
-                                    echo "${STAGE_NAME}: done: ${currentBuild.currentResult}"
+                       post { /* run-remote-tests */
+                          cleanup {
+                              archiveArtifacts(
+                                  artifacts: "${STAGE_NAME}-result.txt, ${env.remote_out}",
+                                  fingerprint: true)
+                               echo "${STAGE_NAME}: done: ${currentBuild.currentResult}"
                                 }
                             }
                         }
-                    }
-                }
+
 
                 stage('run-qemu-tests') {
                     when {
                         expression { return params.RUN_QEMU_TESTS == true \
-                            && readFile('need-test').contains('yes')  }
+                            &&  env.NeedQemutest == 'yes'
+                       }
                     }
 
                     agent { /* run-qemu-tests */
@@ -375,19 +330,3 @@ echo "--------" >> ${STAGE_NAME}-result.txt
 }
 
 
-void tdd_upload_tftp_files(String keyId, String server, String root, String files) {
-    echo 'upload_tftp_files: key   = @' + keyId + '@'
-    echo 'upload_tftp_files: root  = @' + root + '@'
-    echo 'upload_tftp_files: files = @' + files + '@'
-
-    sshagent (credentials: [keyId]) {
-        sh("""#!/bin/bash -ex
-
-ssh ${server} ls -lh ${root}
-for f in "${files}"; do
-    scp \${f} ${server}:${root}/\${f}
-done
-ssh ${server} ls -lh ${root}
-""")
-    }
-}
