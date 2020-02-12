@@ -1,0 +1,2 @@
+tftp_server=${tftp_server:="user@server"}
+host=${host:="saber1"}
