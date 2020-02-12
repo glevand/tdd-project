@@ -1,44 +1,17 @@
 /*
- * Create all OS projects on a new Jenkins server.
+ * Create TDD CI jobs on a Jenkins server.
  *
  * This entire script can be pasted directly into the text box found at
- * ${JENKINS_URL}/script to populate the server with OS jobs.  It will
- * define everything based on the contents of this repository.
- *
- * If any required plugins are not installed when this script is run,
- * they will be downloaded and installed automatically, and Jenkins will
- * be restarted to enable them.  In this case, this script must be run
- * again after the restart to create the jobs.
+ * ${JENKINS_URL}/script to populate the server with jobs
  *
  * Note that settings such as user permissions and secret credentials
  * are not handled by this script.
  */
 
-/* Install required plugins and restart Jenkins, if necessary.  */
-final List<String> REQUIRED_PLUGINS = [
-    "aws-credentials",
-    "copyartifact",
-    "git",
-    "ssh-agent",
-    "tap",
-    "workflow-aggregator",
-]
-if (Jenkins.instance.pluginManager.plugins.collect {
-        it.shortName
-    }.intersect(REQUIRED_PLUGINS).size() != REQUIRED_PLUGINS.size()) {
-    REQUIRED_PLUGINS.collect {
-        Jenkins.instance.updateCenter.getPlugin(it).deploy()
-    }.each {
-        it.get()
-    }
-    Jenkins.instance.restart()
-    println 'Run this script again after restarting to create the jobs!'
-    throw new RestartRequiredException(null)
-}
-
-/* Define what to clone.  */
-final String REPO_URL = 'https://github.com/glevand/coreos--jenkins-os.git'
+final String REPO_URL = 'https://github.com/glevand/tdd-project.git'
+final String REPO_JOB_PATH = 'jenkins/jobs'
 final String REPO_BRANCH = 'master'
+final String BASE_FOLDER = 'tdd'
 
 /*
  * Create a new folder project under the given parent model.
@@ -70,7 +43,7 @@ Job createPipeline(String name,
                    ModifiableTopLevelItemGroup parent = Jenkins.instance,
                    String description = '',
                    String repo = REPO_URL,
-                   String branch = REPO_BRANCH,
+                   String branch = '${PIPELINE_BRANCH}',
                    String script = 'Jenkinsfile',
                    String defaultPipelineBranch = REPO_BRANCH) {
     parent.createProjectFromXML(name, new ByteArrayInputStream("""\
@@ -82,7 +55,7 @@ Job createPipeline(String name,
       <parameterDefinitions>
         <hudson.model.StringParameterDefinition>
           <name>PIPELINE_BRANCH</name>
-          <description>Branch to use for fetching the pipeline jobs</description>
+          <description>Branch to use for fetching the Jenkins pipeline jobs.</description>
           <defaultValue>${defaultPipelineBranch}</defaultValue>
         </hudson.model.StringParameterDefinition>
       </parameterDefinitions>
@@ -118,51 +91,55 @@ if (proc.exitValue() != 0)
     throw new Exception('Could not create a temporary directory')
 final String REPO_PATH = proc.text.trim()
 
-/* Fetch all the OS Groovy pipeline scripts.  */
+/* Fetch all the Groovy pipeline scripts.  */
 proc = ['/usr/bin/git', 'clone', "--branch=${REPO_BRANCH}", '--depth=1', REPO_URL, REPO_PATH].execute()
 proc.waitFor()
 if (proc.exitValue() != 0)
     throw new Exception("Could not clone ${REPO_URL} into ${REPO_PATH}")
 
-/* List every OS pipeline and directory in the repository.  */
-proc = ['/usr/bin/find', "${REPO_PATH}/os", '-type', 'f', '-name', '*.groovy', '-o', '-type', 'd'].execute()
-proc.waitFor()
-if (proc.exitValue() != 0)
-    throw new Exception("Could not walk ${REPO_PATH}")
+def f_base = createFolder(BASE_FOLDER)
+def f_kernel = createFolder('kernel', f_base)
+def f_distro = createFolder('distro', f_base)
+def f_fedora = createFolder('fedora', f_distro)
 
-/* Create projects mirroring the repository layout.  */
-def dirStack = [REPO_PATH]
-def folderStack = [Jenkins.instance]
-proc.text.eachLine { path ->
-    while (!path.startsWith("${dirStack[-1]}/")) {
-        dirStack.pop()
-        folderStack.pop()
-    }
-    if (path.endsWith('.groovy')) {
-        String branch = REPO_BRANCH
-        if (new File(path).text.contains('PIPELINE_BRANCH'))
-            branch = '${PIPELINE_BRANCH}'
-        createPipeline(path[dirStack[-1].length() + 1 .. -8],
-                       folderStack[-1],
-                       '',
-                       REPO_URL,
-                       branch,
-                       path.substring(REPO_PATH.length() + 1),
-                       REPO_BRANCH)
-    } else {
-        dirStack.push(path)
-        folderStack.push(createFolder(path.split('/')[-1], folderStack[-1]))
-    }
+def jobs = [
+    1: [name: 'kernel-test',
+        description: 'Runs tests on a Linux kernel git repository.',
+        script: '/kernel/kernel-test.groovy',
+        folder: f_kernel],
+    2: [name: 'linux-mainline-trigger',
+        description: 'Polls linux mainline for changes.  Builds kernel and runs a boot test in QEMU.',
+        script: '/kernel/linux-mainline-trigger.groovy',
+        folder: f_kernel],
+    3: [name: 'linux-next-trigger',
+        description: 'Polls linux-next for changes.  Builds kernel and runs a boot test in QEMU.',
+        script: '/kernel/linux-next-trigger.groovy',
+        folder: f_kernel],
+    4: [name: 'linux-4.19.y-stable-trigger',
+        description: 'Polls linux-stable for changes.  Builds kernel and runs a boot test in QEMU.',
+        script: '/kernel/linux-4.19.y-stable-trigger.groovy',
+        folder: f_kernel],
+    5: [name: 'linux-4.20.y-stable-trigger',
+        description: 'Polls linux-stable for changes.  Builds kernel and runs a boot test in QEMU.',
+        script: '/kernel/linux-4.20.y-stable-trigger.groovy',
+        folder: f_kernel],
+    6: [name: 'f29-installer-test',
+        description: 'Test of latest Fedora 29 pxeboot installer.',
+        script: '/distro/fedora/f29-installer-test.groovy',
+        folder: f_fedora],
+]
+
+jobs.each { entry ->
+    println "Creating pipeline job $entry.value.name: $entry.value.description"
+
+    createPipeline(entry.value.name,
+        entry.value.folder,
+        entry.value.description,
+        REPO_URL,
+        '${PIPELINE_BRANCH}',
+        REPO_JOB_PATH + entry.value.script,
+        REPO_BRANCH)
 }
-
-/* Also add a mantle job using the Groovy script from its own repository.  */
-createPipeline('master-builder',
-               createFolder('mantle'),
-               'Build mantle from master for the other jobs.',
-               'https://github.com/glevand/coreos--mantle.git',
-               'master',
-               'Jenkinsfile',
-               'master')
 
 /* Clean up the temporary repository.  */
 proc = ['/bin/rm', '--force', '--recursive', REPO_PATH].execute()
@@ -170,4 +147,4 @@ proc.waitFor()
 if (proc.exitValue() != 0)
     throw new Exception("Could not remove ${REPO_PATH}")
 
-println 'OS jobs were successfully created.'
+println 'Jenkins jobs were successfully created.'
