@@ -79,46 +79,50 @@ on_exit() {
 
 download_fedora_files() {
 	local cmd
-	local dl_root
+	local dir
+        local ssh_no_check="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
 
 	if [[ ${tftp_server} == "localhost" ]]; then
 		cmd=''
-		dl_root="$(pwd)"
+		dir="$(pwd)"
+		cp ${JENKINS_TOP}/jobs/distro/fedora/${type}-qemu.ks ./f_kickstart
 	else
-		cmd="ssh ${tftp_server} "
-		dl_root="/var/tftproot"
+		cmd="ssh ${tftp_server} ${ssh_no_check} "
+		dir="/var/tftproot/${host}"
+		sudo scp ${ssh_no_check} ${JENKINS_TOP}/jobs/distro/fedora/${type}-qemu.ks ${tftp_server}:${dir}/f_kickstart
 	fi
 
-	${cmd} ls -l ${dl_root}/${host}
+	set +e
 
-	${cmd} dl_root=${dl_root} host=${host} files_url=${files_url} sums_url=${sums_url} 'bash -s' <<'EOF'
+        ${cmd} env dir=${dir} f_initrd=${f_initrd} f_kernel=${f_kernel}  bash -s <<'EOF'
 
-set -e
+set -ex
 
-if [[ -f ${dl_root}/${host}/tdd-initrd \
-	&& -f ${dl_root}/${host}/tdd-kernel ]]; then
-	mv -f ${dl_root}/${host}/tdd-initrd ${dl_root}/${host}/tdd-initrd.old
-	mv -f ${dl_root}/${host}/tdd-kernel ${dl_root}/${host}/tdd-kernel.old
+if [[ -f ${dir}/f_initrd \
+	&& -f ${dir}/f_kernel ]]; then
+	mv -f ${dir}/f_initrd ${dir}/f_initrd.old
+	mv -f ${dir}/f_kernel ${dir}/f_kernel.old
 fi
 
-curl --silent --show-error --location ${f30_initrd} > ${dir}/f_initrd
-curl --silent --show-error --location ${f30_kernel} > ${dir}/f_kernel
+curl --silent --show-error --location ${f_initrd} > ${dir}/f_initrd
+curl --silent --show-error --location ${f_kernel} > ${dir}/f_kernel
 
-wget --no-verbose -O ${dl_root}/${host}/tdd-initrd ${dl_initrd}
-wget --no-verbose -O ${dl_root}/${host}/tdd-kernel ${dl_kernel}
-wget --no-verbose -O /tmp/di-sums ${sums_url}/MD5SUMS
+sum1=$(md5sum "${dir}/f_initrd" "${dir}/f_kernel" | cut -f 1 -d ' ')
+sum2=$(md5sum "${dir}/f_initrd.old" "${dir}/f_kernel.old" | cut -f 1 -d ' ')
 
-echo "--- initrd ---"
-[[ -f ${dl_root}/${host}/tdd-initrd.old ]] && md5sum ${dl_root}/${host}/tdd-initrd.old
-md5sum ${dl_root}/${host}/tdd-initrd
-cat /tmp/di-sums | egrep 'netboot/debian-installer/arm64/initrd.gz'
-echo "--- kernel ---"
-[[ -f ${dl_root}/${host}/tdd-kernel.old ]] && md5sum ${dl_root}/${host}/tdd-kernel.old
-md5sum ${dl_root}/${host}/tdd-kernel
-cat /tmp/di-sums | egrep 'netboot/debian-installer/arm64/linux'
-echo "---------"
+set +e
+
+if [[ "${sum1}" != "${sum2}" ]]; then
+        exit 0
+else
+        exit 1
+fi
 
 EOF
+
+return ${?}
+
 }
 
 #===============================================================================
@@ -127,6 +131,8 @@ EOF
 
 script_name="${0##*/}"
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
+JENKINS_TOP=${DOCKER_TOP:-"$( cd "${SCRIPTS_TOP}/../jenkins" && pwd )"}
+
 
 trap "on_exit 'failed.'" EXIT
 set -e
@@ -135,7 +141,7 @@ source ${SCRIPTS_TOP}/lib/util.sh
 
 process_opts "${@}"
 
-config_file="${config_file:-${SCRIPTS_TOP}/upload.conf}"
+config_file="${config_file:-${SCRIPTS_TOP}/upload.conf-sample}"
 
 check_file ${config_file} " --config-file" "usage"
 source ${config_file}
@@ -162,11 +168,11 @@ types="
 type=${type:-"f30"}
 
 case "${type}" in
-f30)
+f30 | f28 )
 	
-	dl_url="https://download.fedoraproject.org/pub/fedora/linux/releases/${type}/Server/aarch64"
-	dl_initrd="${dl_url}/os/images/pxeboot/initrd.img"
-	dl_kernel="${dl_url}/os/images/pxeboot/vmlinuz"
+	f_url="https://download.fedoraproject.org/pub/fedora/linux/releases/${type#f}/Server/aarch64"
+	f_initrd="${f_url}/os/images/pxeboot/initrd.img"
+	f_kernel="${f_url}/os/images/pxeboot/vmlinuz"
 	;;
 daily)
 	release="daily"
@@ -191,8 +197,18 @@ fi
 
 download_fedora_files
 
+result=${?}
+
+set -e
+
 echo "${script_name}: ${host} files ready on ${tftp_server}." >&2
 
 trap "on_exit 'success.'" EXIT
-exit 0
 
+if [[ ${result} -ne 0 ]]; then
+	echo "No new files" >&2
+	exit 1
+else
+	echo "need test" >&2
+	exit 0
+fi
