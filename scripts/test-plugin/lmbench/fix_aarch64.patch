@@ -1,0 +1,49 @@
+From 28ca70b25b5e09b5d06656b8bfb7ee3ddef664dd Mon Sep 17 00:00:00 2001
+From: prasanna <pravi@marvell.com>
+Date: Wed, 7 Aug 2019 20:25:05 +0530
+Subject: [PATCH] done some modifications to run on aarch64 machine
+
+Signed-off-by: prasanna <pravi@marvell.com>
+---
+ SCCS/s.ChangeSet | 0
+ scripts/gnu-os   | 3 +++
+ src/disk.c       | 5 +++++
+ 3 files changed, 8 insertions(+)
+ create mode 100644 SCCS/s.ChangeSet
+
+diff --git a/SCCS/s.ChangeSet b/SCCS/s.ChangeSet
+new file mode 100644
+index 0000000..e69de29
+diff --git a/scripts/gnu-os b/scripts/gnu-os
+index f2f8819..09d0e50 100755
+--- a/scripts/gnu-os
++++ b/scripts/gnu-os
+@@ -827,6 +827,9 @@ EOF
+     i*86:Minix:*:*)
+ 	echo ${UNAME_MACHINE}-pc-minix
+ 	exit 0 ;;
++    aarch*:Linux:*:*)
++        echo ${UNAME_MACHINE}-unknown-linux-gnu
++        exit 0 ;;
+     arm*:Linux:*:*)
+ 	echo ${UNAME_MACHINE}-unknown-linux-gnu
+ 	exit 0 ;;
+diff --git a/src/disk.c b/src/disk.c
+index c3f1154..0e4a15d 100644
+--- a/src/disk.c
++++ b/src/disk.c
+@@ -21,6 +21,11 @@
+ #define	SEEKPOINTS	2000
+ #define	ZONEPOINTS	150
+ 
++#if defined(__aarch64__)
++# define llseek lseek64
++#endif
++
++
+ uint64	disksize(char *);
+ int	seekto(int, uint64);
+ int	zone(char *disk, int oflag, int bsize);
+-- 
+2.17.1
+
