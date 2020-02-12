@@ -16,14 +16,14 @@ usage() {
 	echo "  -k --kernel            - Kernel image. Default: '${kernel}'." >&2
 # TODO	echo "  -m --modules           - Kernel modules directory.  To mount over existing modules directory. Default: '${modules}'." >&2
 	echo "  -o --out-file          - stdout, stderr redirection file. Default: '${out_file}'." >&2
-# TODO	echo "  -r --disk-image        - Raw disk image.  Alternative to --initrd. Default: '${disk_image}'." >&2
 	echo "  -s --systemd-debug     - Run systemd with debug options. Default: '${systemd_debug}'." >&2
 	echo "  -t --qemu-tap          - Use QEMU tap networking. Default: '${qemu_tap}'." >&2
 	echo "  -v --verbose           - Verbose execution." >&2
 	echo "  --hda                  - QEMU IDE hard disk image hda. Default: '${hda}'." >&2
 	echo "  --hdb                  - QEMU IDE hard disk image hdb. Default: '${hdb}'." >&2
 	echo "  --hdc                  - QEMU IDE hard disk image hdc. Default: '${hdc}'." >&2
-	echo "  --pid-file             - QEMU IDE hard disk image hdb. Default: '${pid_file}'." >&2
+	echo "  --hda-boot             - Boot from disk image hda '${hda}'." >&2
+	echo "  --pid-file             - PID file. Default: '${pid_file}'." >&2
 	echo "  --p9-share             - Plan9 share directory. Default: '${p9_share}'." >&2
 	eval "${old_xtrace}"
 }
@@ -31,8 +31,8 @@ usage() {
 process_opts() {
 	local short_opts="a:c:e:f:hi:k:m:o:r:stv"
 	local long_opts="arch:,kernel-cmd:,ether-mac:,hostfwd-offset:,help,initrd:,\
-kernel:,modules:,out-file:,disk-image:,systemd-debug,qemu-tap,verbose,\
-hda:,hdb:,hdc:,pid-file:,p9-share:"
+kernel:,modules:,out-file:,systemd-debug,qemu-tap,verbose,\
+hda:,hdb:,hdc:,hda-boot,pid-file:,p9-share:"
 
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
@@ -82,10 +82,6 @@ hda:,hdb:,hdc:,pid-file:,p9-share:"
 			out_file="${2}"
 			shift 2
 			;;
-		-r | --disk-image)
-			disk_image="${2}"
-			shift 2
-			;;
 		-s | --systemd-debug)
 			systemd_debug=1
 			shift
@@ -110,6 +106,10 @@ hda:,hdb:,hdc:,pid-file:,p9-share:"
 		--hdc)
 			hdc="${2}"
 			shift 2
+			;;
+		--hda-boot)
+			hda_boot=1
+			shift
 			;;
 		--pid-file)
 			pid_file="${2}"
@@ -155,14 +155,16 @@ setup_efi() {
 	check_file ${efi_code_src}
 	check_file ${efi_vars_src}
 
-	copy_file ${efi_vars_src} ${efi_vars}
+	if [[ ! ${distro_test} ]]; then
+		copy_file ${efi_vars_src} ${efi_vars}
+	fi
+
 }
 
 on_exit() {
 	local result=${1}
 
 	echo "${script_name}: Done: ${result}" >&2
-	exit ${result}
 }
 
 #===============================================================================
@@ -208,36 +210,17 @@ arm64|ppc*)
 	;;
 esac
 
-if [[ ! ${kernel} ]]; then
-	echo "${script_name}: ERROR: Must provide --kernel option." >&2
+if [[ ! ${hda_boot} && ! ${kernel} ]] || [[ ${hda_boot} && ${kernel} ]]; then
+	echo "${script_name}: ERROR: Must provide either --kernel or --hda-boot option." >&2
 	usage
 	exit 1
 fi
 
-check_file "${kernel}"
-
-if [[ ! ${initrd} && ! ${disk_image} ]]; then
-	echo "${script_name}: ERROR: Must provide --initrd or --disk-image option." >&2
+if [[ ${hda_boot} && ${initrd} ]]; then
+	echo "${script_name}: ERROR: Must provide either --initrd or --hda-boot option." >&2
 	usage
 	exit 1
 fi
-
-if [[ ${initrd} ]]; then
-	check_file "${initrd}"
-fi
-
-if [[ ${disk_image} ]]; then
-	check_file "${disk_image}"
-	disk_image_root="/dev/vda"
-fi
-
-if [[ ${modules} ]]; then
-	check_directory "${modules}"
-fi
-
-
-qemu_args="-kernel ${kernel}"
-qemu_append_args="${kernel_cmd}"
 
 case "${host_arch}--${target_arch}" in
 amd64--amd64)
@@ -298,19 +281,34 @@ else
 	fi
 fi
 
+if [[ ${kernel} ]]; then
+	check_file "${kernel}"
+	qemu_args+=" -kernel ${kernel}"
+	qemu_append_args+=" ${kernel_cmd}"
+fi
+
 if [[ ${initrd} ]]; then
+	check_file "${initrd}"
 	qemu_args+=" -initrd ${initrd}"
 fi
 
+if [[ ${hda_boot} ]]; then
+	root_partition="/dev/vda"
+	qemu_append_args+=" root=${root_partition} rw"
+fi
+
 if [[ ${hda} ]]; then
+	check_file "${hda}"
 	qemu_args+=" -hda ${hda}"
 fi
 
 if [[ ${hdb} ]]; then
+	check_file "${hdb}"
 	qemu_args+=" -hdb ${hdb}"
 fi
 
 if [[ ${hdc} ]]; then
+	check_file "${hdc}"
 	qemu_args+=" -hdc ${hdc}"
 fi
 
@@ -322,16 +320,16 @@ if [[ ${p9_share} ]]; then
 fi
 
 if [[ ${modules} ]]; then
+	check_directory "${modules}"
 	qemu_args+=" \
 		-virtfs local,id=${MODULES_ID},path=${modules},security_model=none,mount_tag=${MODULES_ID}"
 fi
 
 if [[ ${disk_image} ]]; then # TODO
 	qemu_args+=" \
-		-drive if=none,id=blk,file=${disk_image}   \
+		-drive if=none,id=blk,file=${disk_imag}   \
 		-device virtio-blk-device,drive=blk \
 	"
-	qemu_append_args+=" root=${disk_image_root} rw"
 fi
 
 if [[ ${out_file} ]]; then
