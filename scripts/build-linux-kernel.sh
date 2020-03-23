@@ -331,6 +331,11 @@ fi
 
 check_directory "${kernel_src}" "" "usage"
 
+if [[ ! -f "${kernel_src}/Documentation/CodingStyle" ]]; then
+	echo "${script_name}: ERROR: Check kernel sources: '${kernel_src}'" >&2
+	exit 1
+fi
+
 if test -x "$(command -v ccache)"; then
 	ccache='ccache '
 else
@@ -372,12 +377,12 @@ all)
 	run_install_modules
 	;;
 defconfig)
-	if [[ -n ${target_defconfig} ]]; then
-		eval "make ${make_options} ${target_defconfig}"
-	else
-		eval "make ${make_options} defconfig"
-	fi
-	eval "make ${make_options} savedefconfig"
+	#if [[ ${target_defconfig} ]]; then
+	#	eval "${make_cmd} ${make_options} ${target_defconfig}"
+	#else
+		eval "${make_cmd} ${make_options} defconfig"
+	#fi
+	eval "${make_cmd} ${make_options} savedefconfig"
 	;;
 fresh)
 	run_make_fresh

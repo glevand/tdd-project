@@ -227,6 +227,8 @@ get_user_home() {
 	echo "${result}" | cut -d ':' -f 6
 }
 
+known_arches="arm64 amd64 ppc32 ppc64 ppc64le"
+
 get_arch() {
 	local a=${1}
 

@@ -7,7 +7,7 @@ usage() {
 	echo "${script_name} - Builds TDD container image, Linux kernel, root file system images, runs test suites." >&2
 	echo "Usage: ${script_name} [flags]" >&2
 	echo "Option flags:" >&2
-	echo "  --arch            - Target architecture. Default: ${target_arch}." >&2
+	echo "  --arch            - Target architecture {${known_arches}}. Default: ${target_arch}." >&2
 	echo "  -a --help-all     - Show test help and exit." >&2
 	echo "  -c --config-file  - ${script_name} config file. Default: '${config_file}'." >&2
 	echo "  -h --help         - Show this help and exit." >&2
@@ -284,32 +284,51 @@ build_kernel_from_src() {
 	local build_dir=${5}
 	local install_dir=${6}
 
-	rm -rf ${build_dir} ${install_dir}
+	rm -rf "${build_dir}" "${install_dir}"
 
-	${SCRIPTS_TOP}/build-linux-kernel.sh \
-		--build-dir=${build_dir} \
-		--install-dir=${install_dir} \
-		${target_arch} ${src_dir} defconfig
+	local DEBUG="${DEBUG:-bash -x}"
 
-	if [[ ${config} != 'defconfig' ]]; then
-		if [[ -f ${config} ]]; then
-			cp -vf ${config} ${build_dir}/.config
+	# build defconfig
+	${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
+		${verbose:+--verbose} \
+		--build-dir="${build_dir}" \
+		--install-dir="${install_dir}" \
+		${toolchain_prefix:+--toolchain-prefix="${toolchain_prefix}"} \
+		"${target_arch}" "${src_dir}" defconfig
+
+	# build config
+	if [[ "${config}" && "${config}" != "defconfig" ]]; then
+		if [[ -f "${config}" ]]; then
+			cp -vf "${config}" "${build_dir}/.config"
+			${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
+				${verbose:+--verbose} \
+				--build-dir="${build_dir}" \
+				--install-dir="${install_dir}" \
+				${toolchain_prefix:+--toolchain-prefix="${toolchain_prefix}"} \
+				"${target_arch}" "${src_dir}" olddefconfig
 		else
-			curl --silent --show-error --location ${config} \
-				> ${build_dir}/.config
+			${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
+				${verbose:+--verbose} \
+				--build-dir="${build_dir}" \
+				--install-dir="${install_dir}" \
+				${toolchain_prefix:+--toolchain-prefix="${toolchain_prefix}"} \
+				"${target_arch}" "${src_dir}" "${config}"
 		fi
 	fi
 
-	bash -x ${SCRIPTS_TOP}/set-config-opts.sh \
+	${DEBUG} "${SCRIPTS_TOP}/set-config-opts.sh" \
 		--verbose \
-		${platform_args:+"--platform-args='${platform_args}'"} \
-		${fixup_spec} ${build_dir}/.config
+		${platform_args:+--platform-args="${platform_args}"} \
+		"${fixup_spec}" "${build_dir}/.config"
 
-	bash -x ${SCRIPTS_TOP}/build-linux-kernel.sh \
-		--build-dir=${build_dir} \
-		--install-dir=${install_dir} \
+
+	# build all
+	${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
 		${verbose:+--verbose} \
-		${target_arch} ${src_dir} all
+		--build-dir="${build_dir}" \
+		--install-dir="${install_dir}" \
+		${toolchain_prefix:+--toolchain-prefix="${toolchain_prefix}"} \
+		"${target_arch}" "${src_dir}" all
 }
 
 build_kernel_from_repo() {
@@ -411,7 +430,9 @@ create_sysroot() {
 	${sudo} rsync -a --delete ${rootfs}/ ${sysroot}/
 	${sudo} chown $(id --user --real --name): ${sysroot}
 
-	${SCRIPTS_TOP}/prepare-sysroot.sh ${sysroot}
+	${SCRIPTS_TOP}/prepare-sysroot.sh \
+		${verbose:+--verbose} \
+		${sysroot}
 }
 
 build_tests() {

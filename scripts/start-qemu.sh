@@ -267,7 +267,8 @@ amd64--ppc*)
 	unset have_efi
 	qemu_exe="qemu-system-ppc64"
 	#qemu_args+=" -machine cap-htm=off -m 2048"
-	qemu_args+=" -machine pseries,cap-htm=off -m 2048"
+	#qemu_args+=" -machine pseries,cap-htm=off -m 2048"
+	qemu_args+=" -machine pseries,cap-htm=off -m 2048 -append 'root=/dev/ram0 console=hvc0'"
 	;;
 *)
 	echo "${script_name}: ERROR: Unsupported host--target combo: '${host_arch}--${target_arch}'." >&2

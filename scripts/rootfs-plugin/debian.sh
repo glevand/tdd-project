@@ -30,9 +30,9 @@ bootstrap_rootfs() {
 		;;
 	ppc32|ppc64)
 		debian_arch="powerpc"
-		debian_os_release=${debian_os_release:-"unstable"}
+		debian_os_release=${debian_os_release:-"sid"}
 		debian_os_mirror=${debian_os_mirror:-"http://ftp.ports.debian.org/debian-ports"}
-		debootstrap_extra="--include=debian-ports-archive-keyring --exclude=powerpc-ibm-utils,powerpc-utils"
+		debootstrap_extra="--include=debian-ports-archive-keyring --exclude=powerpc-ibm-utils,powerpc-utils,vim-tiny"
 		;;
 	*)
 		echo "${script_name}: ERROR: Unsupported target-arch '${target_arch}'." >&2
@@ -40,9 +40,16 @@ bootstrap_rootfs() {
 		;;
 	esac
 
+	${sudo} chown root: ${rootfs}/
+
 	(${sudo} debootstrap --foreign --arch ${debian_arch} --no-check-gpg \
 		${debootstrap_extra} \
 		${debian_os_release} ${rootfs} ${debian_os_mirror})
+
+	stat "${rootfs}/" "${rootfs}/dev" "${rootfs}/var" || :
+
+	cat "${rootfs}/etc/apt/sources.list" || :
+	cat "${rootfs}/etc/apt/sources.list.d/"* || :
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
@@ -105,7 +112,6 @@ setup_packages() {
 		apt-get -y install ${packages}
 	"
 	debug_check "${FUNCNAME[0]}:${LINENO}"
-
 }
 
 setup_initrd_boot() {

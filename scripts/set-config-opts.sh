@@ -123,9 +123,7 @@ while read -r update; do
 
 done < "${spec_file}"
 
-if [[ ${platform_args} ]]; then
-	sed  --in-place "{s@platform_args@${platform_args}@g}" ${kernel_config}
-fi
+sed  --in-place "{s@platform_args@${platform_args}@g}" ${kernel_config}
 
 diff -u "${kernel_config}".orig "${kernel_config}" || : >&2
 

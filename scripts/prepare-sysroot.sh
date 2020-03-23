@@ -98,24 +98,19 @@ fi
 check_opt 'sysroot' "${sysroot}"
 check_directory "${sysroot}" "" "usage"
 
-
-if [[ ${absolute} ]]; then
-	extra_args+="--absolute "
-fi
-
-if [[ ${dry_run} ]]; then
-	extra_args+="--dry-run "
-fi
-
-if [[ ${verbose} ]]; then
-	extra_args+="--verbose "
-fi
-
 # FIXME: Need to fixup /etc/ld.so.conf?
 
-${SCRIPTS_TOP}/relink.sh ${extra_args} --root-dir=${sysroot} \
+${SCRIPTS_TOP}/relink.sh \
+	--root-dir=${sysroot} \
+	${absolute:+--absolute} \
+	${dry_run:+--dry-run} \
+	${verbose:+--verbose} \
 	--start-dir=${sysroot}
-${SCRIPTS_TOP}/prepare-ld-scripts.sh ${extra_args} --root-dir=${sysroot} \
+${SCRIPTS_TOP}/prepare-ld-scripts.sh \
+	--root-dir=${sysroot} \
+	${absolute:+--absolute} \
+	${dry_run:+--dry-run} \
+	${verbose:+--verbose} \
 	--start-dir=${sysroot}
 
 trap "on_exit 'Success.'" EXIT
