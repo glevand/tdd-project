@@ -161,6 +161,7 @@ fi
 if [[ ! ${as_root} ]]; then
 	docker_extra_args+=" \
 	-u $(id --user --real):$(id --group --real) \
+	-v ${HOME}/.ssh:${HOME}/.ssh:ro \
 	-v /etc/group:/etc/group:ro \
 	-v /etc/passwd:/etc/passwd:ro \
 	-v /etc/shadow:/etc/shadow:ro \
