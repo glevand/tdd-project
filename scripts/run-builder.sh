@@ -119,7 +119,7 @@ DOCKER_TAG=${DOCKER_TAG:-"$("${DOCKER_TOP}/builder/build-builder.sh" --tag)"}
 
 process_opts "${@}"
 
-docker_extra_args=""
+unset docker_extra_args
 container_name=${container_name:-"tdd-builder"}
 user_cmd=${user_cmd:-"/bin/bash"}
 
@@ -134,24 +134,17 @@ if [[ ${tag} ]]; then
 	exit 0
 fi
 
-if [[ ! ${TDD_CHECKOUT_SERVER} ]]; then
-	echo "${script_name}: ERROR: TDD_CHECKOUT_SERVER not defined." >&2
-	usage
-	exit 1
-fi
-if [[ ! ${TDD_RELAY_SERVER} ]]; then
-	echo "${script_name}: ERROR: TDD_RELAY_SERVER not defined." >&2
-	usage
-	exit 1
-fi
-if [[ ! ${TDD_TFTP_SERVER} ]]; then
-	echo "${script_name}: ERROR: TDD_TFTP_SERVER not defined." >&2
-	usage
-	exit 1
-fi
+declare -n server
+for server in "TDD_CHECKOUT_SERVER" "TDD_RELAY_SERVER" "TDD_TFTP_SERVER"; do
+	if [[ ! ${server} ]]; then
+		echo "${script_name}: WARNING: ${!server} not defined." >&2
+		server="0.0.0.0"
+	fi
+	echo "${script_name}: INFO: ${!server} = '${server}'." >&2
+done
 
 if [[ ! ${SSH_AUTH_SOCK} ]]; then
-	echo "${script_name}: ERROR: SSH_AUTH_SOCK not defined." >&2
+	echo "${script_name}: WARNING: SSH_AUTH_SOCK not defined." >&2
 fi
 
 if ! echo "${docker_args}" | grep -q ' -w '; then
@@ -172,7 +165,7 @@ add_server ${TDD_CHECKOUT_SERVER}
 add_server ${TDD_RELAY_SERVER}
 add_server ${TDD_TFTP_SERVER}
 
-echo "${script_name}: ${TDD_TARGET_BMC_LIST} = '${TDD_TARGET_BMC_LIST}'." >&2
+echo "${script_name}: TDD_TARGET_BMC_LIST = '${TDD_TARGET_BMC_LIST}'." >&2
 
 for s in ${TDD_TARGET_BMC_LIST}; do
 	add_server ${s}
@@ -182,10 +175,16 @@ if egrep '127.0.0.53' /etc/resolv.conf; then
 	docker_extra_args+=" --dns 127.0.0.53"
 fi
 
+unset docker_kvm_args
+if [[ -c "/dev/kvm" ]]; then
+	docker_kvm_args=" --device /dev/kvm --group-add $(stat --format=%g /dev/kvm)"
+fi
+
+echo "${script_name}: docker_extra_args = '${docker_extra_args}'." >&2
+
 eval "docker run \
 	--rm \
 	-it \
-	--device /dev/kvm \
 	--privileged \
 	--network host \
 	--name ${container_name} \
@@ -193,7 +192,6 @@ eval "docker run \
 	--add-host ${container_name}:127.0.0.1 \
 	-v ${SSH_AUTH_SOCK}:/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent \
 	--group-add $(stat --format=%g /var/run/docker.sock) \
-	--group-add $(stat --format=%g /dev/kvm) \
 	--group-add sudo \
 	-v /var/run/docker.sock:/var/run/docker.sock \
 	-e TDD_CHECKOUT_SERVER \
@@ -203,6 +201,7 @@ eval "docker run \
 	-e TDD_TFTP_SERVER \
 	-e TDD_TFTP_USER \
 	-e TDD_TFTP_ROOT \
+	${docker_kvm_args} \
 	${docker_extra_args} \
 	${docker_args} \
 	${DOCKER_TAG} \
