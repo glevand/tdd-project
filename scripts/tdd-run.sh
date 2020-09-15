@@ -177,19 +177,14 @@ on_exit() {
 		${sudo} chown -R $(id --user --real --name): ${image_dir}
 	fi
 
-	local end_time="$(date)"
-	local end_sec="${SECONDS}"
-	local end_min
-	if test -x "$(command -v bc)"; then
-		end_min="$(bc <<< "scale=2; ${end_sec} / 60")"
-	else
-		end_min="$((end_sec / 60)).$(((end_sec * 100) / 60))"
-	fi
+	local end_time
+	end_time="$(date)"
+	local sec="${SECONDS}"
 
 	set +x
 	echo "${script_name}: start time: ${start_time}" >&2
 	echo "${script_name}: end time:   ${end_time}" >&2
-	echo "${script_name}: duration:   ${end_sec} seconds (${end_min} min)" >&2
+	echo "${script_name}: duration:   ${sec} sec ($(sec_to_min ${sec} min) min)" >&2
 	echo "${script_name}: Done:       ${result}" >&2
 }
 
