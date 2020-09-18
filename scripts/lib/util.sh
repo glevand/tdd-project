@@ -117,6 +117,57 @@ check_not_opt() {
 	fi
 }
 
+check_progs() {
+	local progs="${*}"
+	local p;
+	local result;
+
+	result=0
+	for p in ${progs}; do
+		if ! test -x "$(command -v "${p}")"; then
+			echo "${script_name}: ERROR: Please install '${p}'." >&2
+			result=1
+		fi
+	done
+
+	return ${result}
+}
+
+check_pairs () {
+	local -n _check_pairs__pairs=${1}
+	local key
+	local val
+	local result
+
+	result=0
+	for key in "${!_check_pairs__pairs[@]}"; do
+		val="${_check_pairs__pairs[${key}]}"
+		[[ ${verbose} ]] && echo "${script_name}: check: '${val}' => '${key}'." >&2
+
+		if [[ ! -e "${val}" ]]; then
+			echo "${script_name}: ERROR: '${val}' not found, please install '${key}'." >&2
+			((result += 1))
+		fi
+	done
+	return ${result}
+}
+
+check_progs_and_pairs () {
+	local progs="${1}"
+	local -n _check_progs_and_pairs__pairs=${2}
+	local result
+
+	result=0
+	if ! check_progs "${progs}"; then
+		((result += 1))
+	fi
+
+	if ! check_pairs _check_progs_and_pairs__pairs; then
+		((result += 1))
+	fi
+	return ${result}
+}
+
 find_common_parent() {
 	local dir1
 	dir1="$(realpath -m "${1}")"
