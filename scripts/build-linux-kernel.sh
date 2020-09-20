@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
 usage() {
+	local old_xtrace
+	old_xtrace="$(shopt -po xtrace || :)"
+	set +o xtrace
+
 	local target_list
 	target_list="$(clean_ws "${targets}")"
 	local op_list
 	op_list="$(clean_ws "${ops}")"
 
-	local old_xtrace
-	old_xtrace="$(shopt -po xtrace || :)"
-	set +o xtrace
 	echo "${script_name} - Builds linux kernel." >&2
 	echo "Usage: ${script_name} [flags] <target> <kernel_src> <op>" >&2
 	echo "Option flags:" >&2
@@ -19,12 +20,11 @@ usage() {
 	echo "  -l --local-version    - Default: '${local_version}'." >&2
 	echo "  -p --toolchain-prefix - Default: '${toolchain_prefix}'." >&2
 	echo "Args:" >&2
-	echo "  <target> - Build target {${target_list}}." >&2
-	echo "  Default target: '${target}'." >&2
-	echo "  <kernel-src> - Kernel source directory." >&2
-	echo "  Default kernel-src: '${kernel_src}'." >&2
-	echo "  <op> - Build operation {${op_list}}." >&2
-	echo "  Default op: '${op}'." >&2
+	echo "  <target> - Build target.  Default: '${target}'." >&2
+	echo "  Known targets: ${target_list}" >&2
+	echo "  <kernel-src> - Kernel source directory.  Default : '${kernel_src}'." >&2
+	echo "  <op> - Build operation.  Default: '${op}'." >&2
+	echo "  Known targets: ${op_list}" >&2
 	echo "Info:" >&2
 	echo "  ${cpus} CPUs available." >&2
 
@@ -73,14 +73,12 @@ build-dir:,install-dir:,local-version:,toolchain-prefix:"
 			target=${2}
 			kernel_src=${3}
 			op=${4}
-			if [[ ${check} ]]; then
-				break
-			fi
 			if ! shift 4; then
 				echo "${script_name}: ERROR: Missing args:" >&2
 				echo "${script_name}:        <target>='${target}'" >&2
 				echo "${script_name}:        <kernel_src>='${kernel_src}'" >&2
 				echo "${script_name}:        <op>='${op}'" >&2
+				echo "" >&2
 				usage
 				exit 1
 			fi
@@ -109,20 +107,44 @@ on_exit() {
 		rm -rf "${tmp_dir}"
 	fi
 
+	echo "----------------------------------------------------------" >&2
+	#${ccache} --show-config
+	${ccache} --show-stats >&2
+	echo "----------------------------------------------------------" >&2
+
+	if [[ -f "${stderr_out}" ]]; then
+		cat "${stderr_out}" >&2
+		echo "----------------------------------------------------------" >&2
+	fi
+
+	local color
+	local word
+	if [[ ${result} -eq 0 ]]; then
+		color="${ansi_green}"
+		word="OK"
+	else
+		color="${ansi_red}"
+		word="failed"
+	fi
+
 	set +x
 	echo "" >&2
-	echo "${script_name}: Done:          result=${result}" >&2
-	echo "${script_name}: target:        ${target}" >&2
-	echo "${script_name}: op:            ${op}" >&2
-	echo "${script_name}: kernel_src:    ${kernel_src}" >&2
-	echo "${script_name}: build_dir:     ${build_dir}" >&2
-	echo "${script_name}: install_dir:   ${install_dir}" >&2
-	echo "${script_name}: local_version: ${local_version}" >&2
+	echo -e "${script_name}: Done:          ${color}result = ${word} (${result})${ansi_reset}" >&2
+	echo "${script_name}: target:        '${target}'" >&2
+	echo "${script_name}: op:            '${op}'" >&2
+	echo "${script_name}: kernel_src:    '${kernel_src}'" >&2
+	echo "${script_name}: build_dir:     '${build_dir}'" >&2
+	echo "${script_name}: install_dir:   '${install_dir}'" >&2
+	echo "${script_name}: local_version: '${local_version}'" >&2
 	echo "${script_name}: make_options:  ${make_options}" >&2
 	echo "${script_name}: start_time:    ${start_time}" >&2
 	echo "${script_name}: end_time:      ${end_time}" >&2
 	echo "${script_name}: duration:      ${sec} sec ($(sec_to_min ${sec} min) min)" >&2
 	exit ${result}
+}
+
+run_cmd_tee () {
+	eval "${@} 2> >(tee '${stderr_out}' >&2)"
 }
 
 run_make_fresh() {
@@ -136,7 +158,7 @@ run_make_fresh() {
 
 run_make_targets() {
 	eval "${make_cmd} ${make_options} savedefconfig"
-	eval "${make_cmd} ${make_options} ${target_make_targets}"
+	run_cmd_tee "${make_cmd} ${make_options} ${target_make_targets}"
 }
 
 run_install_image() {
@@ -146,7 +168,7 @@ run_install_image() {
 	"${toolchain_prefix}strip" -s -R .comment "${build_dir}/vmlinux" -o "${install_dir}/boot/vmlinux.strip"
 
 	if [[ -z "${target_copy}" ]]; then
-		eval "${make_cmd} ${make_options} install"
+		run_cmd_tee "${make_cmd} ${make_options} install"
 	else
 		for ((i = 0; i <= ${#target_copy[@]} - 1; i += 2)); do
 			cp --no-dereference "${build_dir}/${target_copy[i]}" "${install_dir}/${target_copy[i+1]}"
@@ -164,7 +186,7 @@ run_install_image() {
 
 run_install_modules() {
 	mkdir -p "${install_dir}/lib/modules"
-	eval "${make_cmd} ${make_options} modules_install"
+	run_cmd_tee "${make_cmd} ${make_options} modules_install"
 }
 
 default_toolchain_prefix() {
@@ -202,11 +224,12 @@ set_target_variables() {
 # target_make_targets
 
 	case "${target}" in
-	amd64)
+	amd64|x86_64)
 		target_make_options="ARCH=x86_64 CROSS_COMPILE='${ccache}${toolchain_prefix}'"
 		target_defconfig="${target_defconfig:-${target}_defconfig}"
 		target_copy=(
 			vmlinux boot/
+			arch/x86/boot/bzImage boot/
 		)
 		;;
 	arm64|arm64_be)
@@ -254,18 +277,20 @@ set_target_variables() {
 		;;
 	esac
 }
-#===============================================================================
-# program start
+
 #===============================================================================
 export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
+script_name="${0##*/}"
+SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+
+start_time="$(date)"
+SECONDS=0
+
+trap "on_exit" EXIT
+set -o pipefail
 set -e
 
-script_name="${0##*/}"
-
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 source "${SCRIPTS_TOP}/lib/util.sh"
-
-trap "on_exit 'failed.'" EXIT
 
 targets="
 	amd64
@@ -283,6 +308,7 @@ ops="
 	build: targets
 	defconfig
 	fresh
+	help
 	headers: mrproper defconfig prepare
 	image_install
 	install: install_image install_modules
@@ -300,6 +326,7 @@ ops="
 cpus="$(cpu_count)"
 
 make_cmd="${make_cmd:-env PS4='+ \${0##*/}: ' make}"
+ccache="ccache "
 
 process_opts "${@}"
 
@@ -321,6 +348,8 @@ if [[ ! ${local_version} ]]; then
 	local_version="${kernel_src##*/}"
 fi
 
+stderr_out="${build_dir}/stderr.out"
+
 toolchain_prefix="${toolchain_prefix:-$(default_toolchain_prefix "${target}")}"
 
 if [[ ${usage} ]]; then
@@ -329,6 +358,8 @@ if [[ ${usage} ]]; then
 	exit 0
 fi
 
+rm -f "${stderr_out}"
+
 check_directory "${kernel_src}" "" "usage"
 
 if [[ ! -f "${kernel_src}/Documentation/CodingStyle" ]]; then
@@ -336,10 +367,15 @@ if [[ ! -f "${kernel_src}/Documentation/CodingStyle" ]]; then
 	exit 1
 fi
 
-if test -x "$(command -v ccache)"; then
-	ccache='ccache '
-else
-	echo "${script_name}: INFO: Please install ccache" >&2
+progs="bc bison ccache flex"
+declare -A pairs=(
+	[libelf-dev]='/usr/include/libelf.h'
+	[libssl-dev]='/usr/include/openssl/evp.h'
+	[libncurses-dev]='/usr/include/ncurses.h'
+)
+
+if ! check_progs_and_pairs "${progs}" pairs; then
+	exit 2
 fi
 
 declare -a target_copy
@@ -347,20 +383,23 @@ declare -a target_copy_extra
 
 set_target_variables "${target}"
 
-declare -A target_args
-
 if [[ ${verbose} ]]; then
 	make_options_extra="V=1"
 fi
 
 make_options_user="${make_options_user:-}"
 
-make_options="-j${cpus} ${target_make_options} INSTALL_MOD_PATH='${install_dir}' INSTALL_PATH='${install_dir}/boot' INSTALLKERNEL=non-existent-file O='${build_dir}' ${make_options_extra} ${make_options_user}"
+if test -x "$(command -v "depmod")"; then
+	unset depmod
+else
+	depmod="${depmod:- DEPMOD=/bin/true}"
+fi
 
-start_time="$(date)"
-SECONDS=0
+make_options="-j${cpus} ${target_make_options}${depmod} INSTALL_MOD_PATH='${install_dir}' INSTALL_PATH='${install_dir}/boot' INSTALLKERNEL=non-existent-file O='${build_dir}' ${make_options_extra} ${make_options_user}"
 
 export CCACHE_DIR=${CCACHE_DIR:-"${build_dir}.ccache"}
+export CCACHE_MAXSIZE="8G"
+export CCACHE_NLEVELS="4"
 
 mkdir -p "${build_dir}"
 mkdir -p "${CCACHE_DIR}"
@@ -387,10 +426,13 @@ defconfig)
 fresh)
 	run_make_fresh
 	;;
+help)
+	eval "${make_cmd} ${make_options} help"
+	;;
 headers)
 	eval "${make_cmd} ${make_options} mrproper"
-	eval "${make_cmd} ${make_options} defconfig"
-	eval "${make_cmd} ${make_options} prepare"
+	run_cmd_tee "${make_cmd} ${make_options} defconfig"
+	run_cmd_tee "${make_cmd} ${make_options} prepare"
 	;;
 image_install)
 	run_install_image
@@ -418,6 +460,6 @@ gconfig | menuconfig | oldconfig | olddefconfig | xconfig)
 	;;
 *)
 	echo "${script_name}: INFO: Unknown op: '${op}'" >&2
-	eval "${make_cmd} ${make_options} ${op}"
+	run_cmd_tee "${make_cmd} ${make_options} ${op}"
 	;;
 esac
