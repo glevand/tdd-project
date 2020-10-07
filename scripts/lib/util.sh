@@ -508,6 +508,12 @@ get_container_id() {
 	echo "${container_id}"
 }
 
+ansi_reset='\e[0m'
+ansi_red='\e[1;31m'
+ansi_green='\e[0;32m'
+ansi_blue='\e[0;34m'
+ansi_teal='\e[0;36m'
+
 if [[ ${PS4} == '+ ' ]]; then
 	if [[ ${JENKINS_URL} ]]; then
 		export PS4='+ [${STAGE_NAME}] \${BASH_SOURCE##*/}:\${LINENO}: '
