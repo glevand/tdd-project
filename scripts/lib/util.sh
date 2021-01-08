@@ -31,11 +31,11 @@ substring_ends() {
 
 sec_to_min() {
 	local sec=${1}
-	local min=$((sec / 60))
-	local frac_10=$(((sec - min * 60) * 10 / 60))
-	local frac_100=$(((sec - min * 60) * 100 / 60))
+	local min=$(( sec / 60 ))
+	local frac_10=$(( (sec - min * 60) * 10 / 60 ))
+	local frac_100=$(( (sec - min * 60) * 100 / 60 ))
 
-	if ((frac_10 != 0)); then
+	if (( frac_10 != 0 )); then
 		unset frac_10
 	fi
 
@@ -43,13 +43,36 @@ sec_to_min() {
 }
 
 test_sec_to_min() {
-	local start=${1:-1}
-	local end=${2:-100}
+	local start=${1:-0}
+	local end=${2:-500}
 	local enc=${3:-1}
 
-	for ((sec = start; sec <= end; sec += enc)); do
-		echo "${sec} sec = $(sec_to_min ${sec}) ($(echo "scale=2; ${sec}/60" | bc -l | sed 's/^\./0./')) min" >&2
+	local failed
+	unset failed
+
+	for (( sec = start; sec <= end; sec += enc )); do
+		local s2m
+		local bc
+
+		s2m="$(sec_to_min ${sec})"
+		bc="$(printf "%0.2f\n" "$(bc -l <<< "scale=2; ${sec}/60")")"
+
+		if [[ "${s2m}" != "${bc}" ]]; then
+			failed=1
+			echo "ERROR: ${sec} sec = ${s2m} (${bc}) min" >&1
+		else
+			echo "${sec} sec = ${s2m} (${bc}) min" >&1
+		fi
 	done
+
+	trap - EXIT
+	if [[ ! ${failed} ]]; then
+		echo "test_sec_to_min: Success."
+		exit 0
+	else
+		echo "test_sec_to_min: Failed."
+		exit 1
+	fi
 }
 
 directory_size_bytes() {
@@ -112,6 +135,17 @@ check_not_opt() {
 
 	if [[ ${value2} ]]; then
 		echo "${script_name}: ERROR (${FUNCNAME[0]}): Can't use --${option2} with --${option1}." >&2
+		usage
+		exit 1
+	fi
+}
+
+check_if_positive() {
+	local name=${1}
+	local val=${2}
+
+	if [[ ! ${val##*[![:digit:]]*} || "${val}" -lt 1 ]]; then
+		echo "${script_name}: ERROR: ${name} must be a positive integer.  Got '${val}'." >&2
 		usage
 		exit 1
 	fi
