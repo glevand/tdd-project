@@ -13,12 +13,13 @@ usage() {
 	echo "${script_name} - Builds linux kernel." >&2
 	echo "Usage: ${script_name} [flags] <target> <kernel_src> <op>" >&2
 	echo "Option flags:" >&2
-	echo "  -h --help             - Show this help and exit." >&2
-	echo "  -v --verbose          - Verbose execution." >&2
 	echo "  -b --build-dir        - Build directory. Default: '${build_dir}'." >&2
 	echo "  -i --install-dir      - Target install directory. Default: '${install_dir}'." >&2
 	echo "  -l --local-version    - Default: '${local_version}'." >&2
 	echo "  -p --toolchain-prefix - Default: '${toolchain_prefix}'." >&2
+	echo "  -h --help             - Show this help and exit." >&2
+	echo "  -v --verbose          - Verbose execution." >&2
+	echo "  -g --debug            - Extra verbose execution." >&2
 	echo "Args:" >&2
 	echo "  <target> - Build target.  Default: '${target}'." >&2
 	echo "  Known targets: ${target_list}" >&2
@@ -32,9 +33,9 @@ usage() {
 }
 
 process_opts() {
-	local short_opts="hvb:i:l:p:"
-	local long_opts="help,verbose,\
-build-dir:,install-dir:,local-version:,toolchain-prefix:"
+	local short_opts="b:i:l:p:hvg"
+	local long_opts="build-dir:,install-dir:,local-version:,toolchain-prefix:,\
+help,verbose,debug"
 
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
@@ -44,15 +45,6 @@ build-dir:,install-dir:,local-version:,toolchain-prefix:"
 	while true ; do
 		#echo "${FUNCNAME[0]}: @${1}@ @${2}@"
 		case "${1}" in
-		-h | --help)
-			usage=1
-			shift
-			;;
-		-v | --verbose)
-			verbose=1
-			set -x
-			shift
-			;;
 		-b | --build-dir)
 			build_dir="${2}"
 			shift 2
@@ -68,6 +60,20 @@ build-dir:,install-dir:,local-version:,toolchain-prefix:"
 		-p | --toolchain-prefix)
 			toolchain_prefix="${2}"
 			shift 2
+			;;
+		-h | --help)
+			usage=1
+			shift
+			;;
+		-v | --verbose)
+			verbose=1
+			shift
+			;;
+		-g | --debug)
+			set -x
+			verbose=1
+			debug=1
+			shift
 			;;
 		--)
 			target=${2}
@@ -306,6 +312,7 @@ targets="
 ops="
 	all: fresh targets install_image install_modules
 	build: targets
+	build-install
 	defconfig
 	fresh
 	help
@@ -415,6 +422,14 @@ all)
 	run_install_image
 	run_install_modules
 	;;
+build|targets)
+	run_make_targets
+	;;
+build-install)
+	run_make_targets
+	run_install_image
+	run_install_modules
+	;;
 defconfig)
 	#if [[ ${target_defconfig} ]]; then
 	#	eval "${make_cmd} ${make_options} ${target_defconfig}"
@@ -450,9 +465,6 @@ rebuild)
 	;;
 savedefconfig)
 	eval "${make_cmd} ${make_options} savedefconfig"
-	;;
-build|targets)
-	run_make_targets
 	;;
 gconfig | menuconfig | oldconfig | olddefconfig | xconfig)
 	eval "${make_cmd} ${make_options} ${op}"
