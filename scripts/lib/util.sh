@@ -75,6 +75,139 @@ test_sec_to_min() {
 	fi
 }
 
+parse_date() {
+	local str=${1}
+	local -n _parse_date__date=${2}
+	local -n _parse_date__day=${3}
+	local -n _parse_date__time=${4}
+
+	local regex_date="(([[:digit:]]{4}\.[[:digit:]]{2}\.[[:digit:]]{2})-(([[:digit:]]{2}\.){2}[[:digit:]]{2}))"
+
+	if [[ ! "${str}" =~ ${regex_date} ]]; then
+		echo "${FUNCNAME[0]}: No match" >&2
+		return 1
+	fi
+
+	_parse_date__date="${BASH_REMATCH[1]}"
+	_parse_date__day="${BASH_REMATCH[2]}"
+	_parse_date__time="${BASH_REMATCH[3]}"
+
+	if [[ ${debug} ]]; then
+		echo "${FUNCNAME[0]}: str:  '${str}'" >&2
+		echo "${FUNCNAME[0]}: date: '${_parse_date__date}'" >&2
+		echo "${FUNCNAME[0]}: day:  '${_parse_date__day}'" >&2
+		echo "${FUNCNAME[0]}: time: '${_parse_date__time}'" >&2
+	fi
+
+	return 0
+}
+
+test_parse_date() {
+	local date
+	local day
+	local time
+
+	debug=1
+	parse_date "${script_name}-$(date +%Y.%m.%d-%H.%M.%S)" date day time
+}
+
+parse_date_git() {
+	local str=${1}
+	local -n _parse_date_git__day=${2}
+	local -n _parse_date_git__month=${3}
+	local -n _parse_date_git__date=${4}
+	local -n _parse_date_git__year=${5}
+	local -n _parse_date_git__time=${6}
+
+	local regex_day="[[:alpha:]]{3}"
+	local regex_month="[[:alpha:]]{3}"
+	local regex_date="[[:digit:]][[:digit:]]?"
+	local regex_time="([[:digit:]]{2}:){2}[[:digit:]]{2}"
+	local regex_year="[[:digit:]]{4}"
+
+	local regex_full="^(${regex_day}) (${regex_month})  ?(${regex_date}) (${regex_time}) (${regex_year})"
+
+	if [[ ! "${str}" =~ ${regex_full} ]]; then
+		echo "ERROR: No match '${str}'" >&2
+		return 1
+	fi
+
+	_parse_date_git__day="${BASH_REMATCH[1]}"
+	_parse_date_git__month="${BASH_REMATCH[2]}"
+	_parse_date_git__date="${BASH_REMATCH[3]}"
+	_parse_date_git__time="${BASH_REMATCH[4]}"
+	_parse_date_git__year="${BASH_REMATCH[6]}"
+
+	if [[ ${debug} ]]; then
+		echo "${FUNCNAME[0]}: str:   '${str}'" >&2
+		echo "${FUNCNAME[0]}: day:   '${_parse_date_git__day}'" >&2
+		echo "${FUNCNAME[0]}: month: '${_parse_date_git__month}'" >&2
+		echo "${FUNCNAME[0]}: date:  '${_parse_date_git__date}'" >&2
+		echo "${FUNCNAME[0]}: year:  '${_parse_date_git__year}'" >&2
+		echo "${FUNCNAME[0]}: time:  '${_parse_date_git__time}'" >&2
+	fi
+	return 0
+}
+
+test_parse_date_git() {
+	local day
+	local month
+	local date
+	local time
+	local year
+
+	debug=1
+	parse_date_git "Wed Jan 8 13:44:58 2020 -0800" day month date year time
+	parse_date_git "Sun Feb 28 11:26:06 2021 -0800" day month date year time
+	parse_date_git "$(date '+%a %b %e %X %Y %z')" day month date year time
+	parse_date_git "$(date '+%c %z')" day month date year time
+}
+
+parse_date_iso_8601() {
+	local str=${1}
+	local -n _parse_date_iso_8601__year=${2}
+	local -n _parse_date_iso_8601__month=${3}
+	local -n _parse_date_iso_8601__day=${4}
+	local -n _parse_date_iso_8601__time=${5}
+
+	local regex_year="[[:digit:]]{4}"
+	local regex_month="[[:digit:]]{2}"
+	local regex_day="[[:digit:]]{2}"
+	local regex_time="[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}"
+
+	local regex_full="^(${regex_year})-(${regex_month})-(${regex_day}) (${regex_time}) "
+
+	if [[ ! "${str}" =~ ${regex_full} ]]; then
+		echo "ERROR: No match '${str}'" >&2
+		return 1
+	fi
+
+	_parse_date_iso_8601__year="${BASH_REMATCH[1]}"
+	_parse_date_iso_8601__month="${BASH_REMATCH[2]}"
+	_parse_date_iso_8601__day="${BASH_REMATCH[3]}"
+	_parse_date_iso_8601__time="${BASH_REMATCH[4]}"
+
+	if [[ ${debug} ]]; then
+		echo "${FUNCNAME[0]}: str:   '${str}'" >&2
+		echo "${FUNCNAME[0]}: year:  '${_parse_date_iso_8601__year}'" >&2
+		echo "${FUNCNAME[0]}: month: '${_parse_date_iso_8601__month}'" >&2
+		echo "${FUNCNAME[0]}: day:   '${_parse_date_iso_8601__day}'" >&2
+		echo "${FUNCNAME[0]}: time:  '${_parse_date_iso_8601__time}'" >&2
+	fi
+	return 0
+}
+
+test_parse_date_iso_8601() {
+	local year
+	local month
+	local day
+	local time
+
+	debug=1
+	parse_date_iso_8601 "2020-12-27 13:30:10 -0800" year month day time
+	parse_date_iso_8601 "2021-01-02 18:16:00 -0800" year month day time
+}
+
 directory_size_bytes() {
 	local dir=${1}
 
