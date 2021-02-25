@@ -28,6 +28,7 @@ usage() {
 	echo "  Known targets: ${op_list}" >&2
 	echo "Info:" >&2
 	echo "  ${cpus} CPUs available." >&2
+	echo "Send bug reports to: Geoff Levand <geoff@infradead.org>." >&2
 
 	eval "${old_xtrace}"
 }
