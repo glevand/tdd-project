@@ -78,7 +78,7 @@ on_exit() {
 	local result=${1}
 
 	if [[ -d ${tmp_dir} ]]; then
-		rm -rf ${tmp_dir}
+		rm -rf "${tmp_dir:?}"
 	fi
 
 	echo "${script_name}: ${result}" >&2

@@ -162,7 +162,7 @@ on_exit() {
 	fi
 
 	if [[ -d ${tmp_dir} ]]; then
-		${sudo} rm -rf ${tmp_dir}
+		"${sudo}" rm -rf "${tmp_dir:?}"
 	fi
 
 	echo "${script_name}: ${result}" >&2

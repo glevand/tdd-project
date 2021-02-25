@@ -106,7 +106,7 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 
 on_exit() {
 	if [ -d ${tmp_dir} ]; then
-		${sudo} rm -rf ${tmp_dir}
+		"${sudo}" rm -rf "${tmp_dir:?}"
 	fi
 }
 
@@ -126,7 +126,7 @@ on_fail() {
 	fi
 
 	if [ -d ${tmp_dir} ]; then
-		${sudo} rm -rf ${tmp_dir}
+		"${sudo}" rm -rf "${tmp_dir:?}"
 	fi
 
 	if [ ${need_clean_rootfs} ]; then
