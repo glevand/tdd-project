@@ -68,6 +68,23 @@ on_exit() {
 	echo "${script_name}: Done : ${result}." >&2
 }
 
+print_paths() {
+	local name="${1}"
+	local paths="${2}"
+
+	paths="${paths%:}"
+
+	echo "${name}"
+
+	readarray -d ':' -t p_array <<< "${paths}"
+
+	local i
+	for (( i = 0; i < ${#p_array[@]}; i++ )); do
+		p_array[i]="${p_array[i]//[$'\n']}"
+		echo " $(( i + 1 )): [${p_array[i]}]"
+	done
+}
+
 #===============================================================================
 export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
 script_name="${0##*/}"
@@ -104,7 +121,7 @@ src_path="$(realpath "${src_path}")"
 declare -a files
 
 if [[ -d "${src_path}" ]]; then
-	readarray files < <(find "${src_path}" -type f | sort)
+	readarray -t files < <(find "${src_path}" -type f | sort)
 elif [[ -f "${src_path}" ]]; then
 	files="${src_path}"
 else
@@ -120,13 +137,16 @@ echo ''
 echo "Source path = '${src_path}'"
 
 lib_regex="^[^(]+\(NEEDED\) *(Shared library: .+)$"
+
 rpath_regex="^[^(]+\(RPATH\) *(Library rpath: .+)$"
 
+runpath_regex="^[^(]+\(RUNPATH\) *(Library runpath: )\[(.+)\]$"
+
 for f in "${files[@]}"; do
-	f="${f//[$'\t\r\n ']}"
+	# f="${f//[$'\t\r\n ']}"
 	if data="$("${readelf}" -d "${f}" 2>/dev/null)"; then
 		echo "----------------------------"
-		echo "'${f}'"
+		echo "File = '${f}'"
 		echo ""
 		while read -r line; do
 			#echo "line = '${line}'"
@@ -136,7 +156,11 @@ for f in "${files[@]}"; do
 			elif [[ "${line}" =~ ${rpath_regex} ]]; then
 				#echo "match = '${BASH_REMATCH[0]}'"
 				echo ""
-				echo "${BASH_REMATCH[1]}"
+				print_paths "${BASH_REMATCH[1]}"
+			elif [[ "${line}" =~ ${runpath_regex} ]]; then
+				#echo "match = '${BASH_REMATCH[0]}'"
+				echo ""
+				print_paths "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
 			fi
 		done< <(echo "${data}")
 		echo ''
