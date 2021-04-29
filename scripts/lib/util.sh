@@ -678,6 +678,7 @@ get_container_id() {
 ansi_reset='\e[0m'
 ansi_red='\e[1;31m'
 ansi_green='\e[0;32m'
+ansi_yellow='\e[1;33m'
 ansi_blue='\e[0;34m'
 ansi_teal='\e[0;36m'
 
