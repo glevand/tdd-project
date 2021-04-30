@@ -83,7 +83,7 @@ script_name="${0##*/}"
 trap "on_exit 'failed.'" EXIT
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
-source ${SCRIPTS_TOP}/lib/util.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 
 process_opts "${@}"
 

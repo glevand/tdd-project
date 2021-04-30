@@ -497,13 +497,13 @@ set -e
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 DOCKER_TOP=${DOCKER_TOP:-"$(cd "${SCRIPTS_TOP}/../docker" && pwd)"}
 
-source ${SCRIPTS_TOP}/lib/util.sh
-source ${SCRIPTS_TOP}/rootfs-plugin/rootfs-plugin.sh
-source ${SCRIPTS_TOP}/test-plugin/test-plugin.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+source "${SCRIPTS_TOP}/rootfs-plugin/rootfs-plugin.sh"
+source "${SCRIPTS_TOP}/test-plugin/test-plugin.sh"
 
 for test in ${known_test_types}; do
 	if [[ -f ${SCRIPTS_TOP}/test-plugin/${test}/${test}.sh ]]; then
-		source ${SCRIPTS_TOP}/test-plugin/${test}/${test}.sh
+		source "${SCRIPTS_TOP}/test-plugin/${test}/${test}.sh"
 	else
 		echo "${script_name}: ERROR: Test plugin '${test}.sh' not found." >&2
 		exit 1

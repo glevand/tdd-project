@@ -181,6 +181,6 @@ test_run_ilp32() {
 }
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
-source ${SCRIPTS_TOP}/lib/util.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 
 TEST_TOP=${TEST_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}

@@ -2,7 +2,7 @@
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
 
-source ${SCRIPTS_TOP}/lib/util.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 
 test_usage_http_wrk() {
 	local old_xtrace

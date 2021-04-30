@@ -376,8 +376,8 @@ script_name="${0##*/}"
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
 RELAY_TOP=${RELAY_TOP:-"$( cd "${SCRIPTS_TOP}/../relay" && pwd )"}
 
-source ${SCRIPTS_TOP}/lib/util.sh
-source ${SCRIPTS_TOP}/lib/chroot.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+source "${SCRIPTS_TOP}/lib/chroot.sh"
 
 trap "on_exit" EXIT
 set -e

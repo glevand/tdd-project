@@ -297,7 +297,7 @@ trap "on_exit" EXIT
 set -o pipefail
 set -e
 
-source "${SCRIPTS_TOP}/lib/util.sh"
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 
 targets="
 	amd64

@@ -6,8 +6,8 @@ script_name="${0##*/}"
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
 
-source ${SCRIPTS_TOP}/lib/util.sh
-source ${SCRIPTS_TOP}/lib/relay.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+source "${SCRIPTS_TOP}/lib/relay.sh"
 
 usage() {
 	local old_xtrace
@@ -375,7 +375,7 @@ remote_ssh_opts=${user_remote_ssh_opts}
 ssh_no_check="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 if [[ -f ${SCRIPTS_TOP}/test-plugin/${test_name}/${test_name}.sh ]]; then
-	source ${SCRIPTS_TOP}/test-plugin/${test_name}/${test_name}.sh
+	source "${SCRIPTS_TOP}/test-plugin/${test_name}/${test_name}.sh"
 else
 	echo "${script_name}: ERROR: Test plugin '${test_name}.sh' not found." >&2
 	exit 1

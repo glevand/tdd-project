@@ -199,7 +199,7 @@ export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\
 
 script_name="${0##*/}"
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
-source ${SCRIPTS_TOP}/lib/util.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 
 trap "on_exit 'failed.'" EXIT
 set -o pipefail

@@ -2,8 +2,8 @@
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
 
-source ${SCRIPTS_TOP}/lib/util.sh
-source ${SCRIPTS_TOP}/lib/chroot.sh
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+source "${SCRIPTS_TOP}/lib/chroot.sh"
 
 test_usage_ltp() {
 	local old_xtrace
