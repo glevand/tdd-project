@@ -375,7 +375,7 @@ if [[ ! -f "${kernel_src}/Documentation/CodingStyle" ]]; then
 	exit 1
 fi
 
-progs="bc bison ccache flex"
+progs="bc bison ccache flex ${toolchain_prefix}gcc"
 declare -A pairs=(
 	[libelf-dev]='/usr/include/libelf.h'
 	[libssl-dev]='/usr/include/openssl/evp.h'
