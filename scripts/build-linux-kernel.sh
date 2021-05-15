@@ -7,36 +7,59 @@ usage() {
 
 	local target_list
 	target_list="$(clean_ws "${targets}")"
+
 	local op_list
 	op_list="$(clean_ws "${ops}")"
 
-	echo "${script_name} - Builds linux kernel." >&2
-	echo "Usage: ${script_name} [flags] <target> <kernel_src> <op>" >&2
-	echo "Option flags:" >&2
-	echo "  -b --build-dir        - Build directory. Default: '${build_dir}'." >&2
-	echo "  -i --install-dir      - Target install directory. Default: '${install_dir}'." >&2
-	echo "  -l --local-version    - Default: '${local_version}'." >&2
-	echo "  -p --toolchain-prefix - Default: '${toolchain_prefix}'." >&2
-	echo "  -h --help             - Show this help and exit." >&2
-	echo "  -v --verbose          - Verbose execution." >&2
-	echo "  -g --debug            - Extra verbose execution." >&2
-	echo "Args:" >&2
-	echo "  <target> - Build target.  Default: '${target}'." >&2
-	echo "  Known targets: ${target_list}" >&2
-	echo "  <kernel-src> - Kernel source directory.  Default : '${kernel_src}'." >&2
-	echo "  <op> - Build operation.  Default: '${op}'." >&2
-	echo "  Known targets: ${op_list}" >&2
-	echo "Info:" >&2
-	echo "  ${cpus} CPUs available." >&2
-	echo "Send bug reports to: Geoff Levand <geoff@infradead.org>." >&2
+	{
+		echo "${script_name} - Builds linux kernel."
+		echo "Usage: ${script_name} [flags] <target> <kernel_src> <op>"
+		echo ''
+		echo 'Option flags:'
+		echo "  -b --build-dir        - Build directory. Default: '${build_dir}'."
+		echo "  -i --install-dir      - Target install directory. Default: '${install_dir}'."
+		echo "  -l --local-version    - Default: '${local_version}'."
+		echo "  -p --toolchain-prefix - Default: '${toolchain_prefix}'."
+		echo "  -V --vbuild           - Verbose kernel build."
+		echo "  -h --help             - Show this help and exit."
+		echo "  -v --verbose          - Verbose execution."
+		echo "  -g --debug            - Extra verbose execution."
+		echo ''
+		echo 'Args:'
+		echo "  <target>     - Build target.  Default: '${target}'."
+		echo "  <kernel-src> - Kernel source directory.  Default : '${kernel_src}'."
+		echo "  <op>         - Build operation.  Default: '${op}'."
+		echo ''
+		echo "  Known targets: ${target_list}"
+		echo ''
+		echo "  Known ops: ${op_list}"
+		echo ''
+		echo 'System Info:'
+		echo "  ${cpus} CPUs available."
+		echo ''
+		echo 'Info:'
+		echo "  ${script_name} (@PACKAGE_NAME@) version @PACKAGE_VERSION@"
+		echo "  @PACKAGE_URL@"
+		echo "  Send bug reports to: Geoff Levand <geoff@infradead.org>."
+	} >&2
 
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="b:i:l:p:hvg"
-	local long_opts="build-dir:,install-dir:,local-version:,toolchain-prefix:,\
-help,verbose,debug"
+	local short_opts="b:i:l:p:Vhvg"
+	local long_opts="build-dir:,install-dir:,local-version:,\
+toolchain-prefix:,vbuild,help,verbose,debug"
+
+	build_dir=''
+	install_dir=''
+	local_version=''
+	toolchain_prefix=''
+	vbuild=''
+	usage=''
+	verbose=''
+	debug=''
+	extra_args=''
 
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
@@ -44,23 +67,27 @@ help,verbose,debug"
 	eval set -- "${opts}"
 
 	while true ; do
-		#echo "${FUNCNAME[0]}: @${1}@ @${2}@"
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
 		-b | --build-dir)
 			build_dir="${2}"
+			shift 2
+			;;
+		-i | --install-dir)
+			install_dir="${2}"
 			shift 2
 			;;
 		-l | --local-version)
 			local_version="${2}"
 			shift 2
 			;;
-		-t | --install-dir)
-			install_dir="${2}"
-			shift 2
-			;;
 		-p | --toolchain-prefix)
 			toolchain_prefix="${2}"
 			shift 2
+			;;
+		-V | --vbuild)
+			vbuild=1
+			shift
 			;;
 		-h | --help)
 			usage=1
@@ -77,22 +104,13 @@ help,verbose,debug"
 			shift
 			;;
 		--)
-			target=${2}
-			kernel_src=${3}
-			op=${4}
-			if ! shift 4; then
-				echo "${script_name}: ERROR: Missing args:" >&2
-				echo "${script_name}:        <target>='${target}'" >&2
-				echo "${script_name}:        <kernel_src>='${kernel_src}'" >&2
-				echo "${script_name}:        <op>='${op}'" >&2
-				echo "" >&2
-				usage
-				exit 1
-			fi
-			if [[ -n "${1}" ]]; then
-				echo "${script_name}: ERROR: Got extra args: '${*}'" >&2
-				usage
-				exit 1
+			shift
+			target="${1:-}"
+			kernel_src="${2:-}"
+			op="${3:-}"
+			if [[ ${4:-} ]]; then
+				shift 3
+				extra_args="${*}"
 			fi
 			break
 			;;
@@ -114,15 +132,21 @@ on_exit() {
 		rm -rf "${tmp_dir}"
 	fi
 
-	echo "----------------------------------------------------------" >&2
-	#${ccache} --show-config
-	${ccache} --show-stats >&2
-	echo "----------------------------------------------------------" >&2
+	{
+		echo '----------------------------------------------------------'
+		echo 'ccache info:'
+		echo ''
+		#${ccache} --show-config
+		${ccache} --show-stats
+		echo '----------------------------------------------------------'
 
-	if [[ -f "${stderr_out}" ]]; then
-		cat "${stderr_out}" >&2
-		echo "----------------------------------------------------------" >&2
-	fi
+		if [[ -f "${stderr_out}" ]]; then
+			echo 'stderr:'
+			echo ''
+			cat "${stderr_out}"
+		echo '----------------------------------------------------------'
+		fi
+	} >&2
 
 	local color
 	local word
@@ -150,8 +174,22 @@ on_exit() {
 	exit ${result}
 }
 
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+	if [[ ${debug} ]]; then
+		echo '------------------------' >&2
+		set >&2
+		echo '------------------------' >&2
+	fi
+	echo "${script_name}: ERROR: (${err_no}) at ${f_name}:${line_no}." >&2
+	exit "${err_no}"
+}
+
 run_cmd_tee () {
-	eval "${@} 2> >(tee '${stderr_out}' >&2)"
+	eval "${*} 2> >(tee '${stderr_out}' >&2)"
 }
 
 run_make_fresh() {
@@ -163,9 +201,15 @@ run_make_fresh() {
 	eval "${make_cmd} ${make_options} olddefconfig"
 }
 
-run_make_targets() {
+run_make_target_ops() {
+	local real_ops
+	if [[ "${target_ops}" == 'defaults' ]]; then
+		real_ops=''
+	else
+		real_ops="${target_ops}"
+	fi
 	eval "${make_cmd} ${make_options} savedefconfig"
-	run_cmd_tee "${make_cmd} ${make_options} ${target_make_targets}"
+	run_cmd_tee "${make_cmd} ${make_options} ${real_ops}"
 }
 
 run_install_image() {
@@ -228,7 +272,7 @@ set_target_variables() {
 # target_defconfig: 
 # target_copy: (src dest)
 # target_copy_extra: (src dest)
-# target_make_targets
+# target_ops
 
 	case "${target}" in
 	amd64|x86_64)
@@ -238,6 +282,8 @@ set_target_variables() {
 			vmlinux boot/
 			arch/x86/boot/bzImage boot/
 		)
+		target_copy_extra=()
+		target_ops='defaults'
 		;;
 	arm64|arm64_be)
 		target_make_options="ARCH=arm64 CROSS_COMPILE='${ccache}${toolchain_prefix}'"
@@ -246,11 +292,15 @@ set_target_variables() {
 			vmlinux boot/
 			arch/arm64/boot/Image boot/
 		)
+		target_copy_extra=()
+		target_ops='defaults'
 		;;
 	native)
 		target_make_options="CROSS_COMPILE='${ccache}'"
 		target_defconfig="${target_defconfig:-defconfig}"
-		target_make_targets="all"
+		target_copy=()
+		target_copy_extra=()
+		target_ops='all'
 		;;
 	ppc32|ppc64)
 		target_make_options="ARCH=powerpc CROSS_COMPILE='${ccache}${toolchain_prefix}'"
@@ -258,6 +308,8 @@ set_target_variables() {
 		target_copy=(
 			vmlinux boot/
 		)
+		target_copy_extra=()
+		target_ops='defaults'
 		;;
 	ppc64le)
 		target_make_options="ARCH=powerpc CROSS_COMPILE='${ccache}${toolchain_prefix}'"
@@ -265,6 +317,8 @@ set_target_variables() {
 		target_copy=(
 			vmlinux boot/
 		)
+		target_copy_extra=()
+		target_ops='defaults'
 		;;
 	ps3)
 		target_make_options="ARCH=powerpc CROSS_COMPILE='""${ccache}${toolchain_prefix}""'"
@@ -276,6 +330,7 @@ set_target_variables() {
 		target_copy_extra=(
 			arch/powerpc/boot/otheros.bld boot/
 		)
+		target_ops='defaults'
 		;;
 	*)
 		echo "${script_name}: ERROR: Unknown target: '${target}'" >&2
@@ -286,18 +341,36 @@ set_target_variables() {
 }
 
 #===============================================================================
-export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
-script_name="${0##*/}"
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
 
-start_time="$(date)"
+script_name="${0##*/}"
+# base_name="${script_name%.sh}"
+
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 SECONDS=0
 
-trap "on_exit" EXIT
+SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+
+tmp_dir=''
+make_options=''
+ccache="ccache "
+stderr_out=''
+
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]} ${LINENO} ${?}' ERR
+
+set -eE
 set -o pipefail
-set -e
+set -o nounset
 
 source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+
+cpus="$(cpu_count)"
+
+process_opts "${@}"
+
+toolchain_prefix="${toolchain_prefix:-$(default_toolchain_prefix "${target}")}"
+set_target_variables "${target}"
 
 targets="
 	amd64
@@ -311,9 +384,9 @@ targets="
 	x86_64
 "
 ops="
-	all: fresh targets install_image install_modules
-	build: targets
-	build-install
+	all: fresh ${target_ops} install_image install_modules
+	build: ${target_ops}
+	build-install: ${target_ops} install_image install_modules
 	defconfig
 	fresh
 	help
@@ -321,9 +394,8 @@ ops="
 	image_install
 	install: install_image install_modules
 	modules_install
-	rebuild: clean targets
+	rebuild: clean ${target_ops}
 	savedefconfig
-	targets
 	gconfig
 	menuconfig
 	oldconfig
@@ -331,39 +403,48 @@ ops="
 	xconfig
 "
 
-cpus="$(cpu_count)"
-
-make_cmd="${make_cmd:-env PS4='+ \${0##*/}: ' make}"
-ccache="ccache "
-
-process_opts "${@}"
-
-if [[ ${build_dir} ]]; then
-	build_dir="$(realpath "${build_dir}")"
-else
+if [[ ! ${build_dir} ]]; then
 	build_dir="$(pwd)/${target}-kernel-build"
 fi
 
-if [[ ${install_dir} ]]; then
-	mkdir -p "${install_dir}"
-	install_dir="$(realpath "${install_dir}")"
-else
+build_dir="$(realpath "${build_dir}")"
+
+if [[ ! ${install_dir} ]]; then
 	install_dir="${build_dir%-*}-install"
-	mkdir -p "${install_dir}"
 fi
+
+mkdir -p "${install_dir}"
+install_dir="$(realpath "${install_dir}")"
 
 if [[ ! ${local_version} ]]; then
 	local_version="${kernel_src##*/}"
 fi
 
 stderr_out="${build_dir}/stderr.out"
-
-toolchain_prefix="${toolchain_prefix:-$(default_toolchain_prefix "${target}")}"
+make_cmd="${make_cmd:-env PS4='+ \${0##*/}: ' make}"
 
 if [[ ${usage} ]]; then
 	usage
 	trap - EXIT
 	exit 0
+fi
+
+if [[ ! ${target} || ! ${kernel_src} || ! ${op} ]]; then
+	{
+		echo "${script_name}: ERROR: Missing args:"
+		echo "${script_name}:   <target> = '${target}'"
+		echo "${script_name}:   <kernel_src> = '${kernel_src}'"
+		echo "${script_name}:   <op> = '${op}'"
+		echo ""
+	} >&2
+	usage
+	exit 1
+fi
+
+if [[ ${extra_args} ]]; then
+	echo "${script_name}: ERROR: Got extra args: '${extra_args}'" >&2
+	usage
+	exit 1
 fi
 
 rm -f "${stderr_out}"
@@ -389,21 +470,30 @@ fi
 declare -a target_copy
 declare -a target_copy_extra
 
-set_target_variables "${target}"
+make_options_extra=''
 
-if [[ ${verbose} ]]; then
-	make_options_extra="V=1"
+if [[ ${vbuild} ]]; then
+	make_options_extra+=' V=1'
 fi
 
 make_options_user="${make_options_user:-}"
 
 if test -x "$(command -v "depmod")"; then
-	unset depmod
+	depmod=''
 else
 	depmod="${depmod:- DEPMOD=/bin/true}"
 fi
 
-make_options="-j${cpus} ${target_make_options}${depmod} INSTALL_MOD_PATH='${install_dir}' INSTALL_PATH='${install_dir}/boot' INSTALLKERNEL=non-existent-file O='${build_dir}' ${make_options_extra} ${make_options_user}"
+make_options=" \
+ -j${cpus} \
+ ${target_make_options}${depmod} \
+ INSTALL_MOD_PATH='${install_dir}' \
+ INSTALL_PATH='${install_dir}/boot' \
+ INSTALLKERNEL=non-existent-file \
+ O='${build_dir}' \
+ ${make_options_extra} \
+ ${make_options_user} \
+"
 
 export CCACHE_DIR=${CCACHE_DIR:-"${build_dir}.ccache"}
 export CCACHE_MAXSIZE="8G"
@@ -419,15 +509,15 @@ tmp_dir="$(mktemp --tmpdir --directory "${script_name}.XXXX")"
 case "${op}" in
 all)
 	run_make_fresh
-	run_make_targets
+	run_make_target_ops
 	run_install_image
 	run_install_modules
 	;;
 build|targets)
-	run_make_targets
+	run_make_target_ops
 	;;
 build-install)
-	run_make_targets
+	run_make_target_ops
 	run_install_image
 	run_install_modules
 	;;
@@ -462,7 +552,7 @@ modules_install)
 	;;
 rebuild)
 	eval "${make_cmd} ${make_options} clean"
-	run_make_targets
+	run_make_target_ops
 	;;
 savedefconfig)
 	eval "${make_cmd} ${make_options} savedefconfig"
