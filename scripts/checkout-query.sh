@@ -61,7 +61,7 @@ process_opts() {
 	done
 }
 
-on_err() {
+on_exit() {
 	set +x
 	set +e
 
@@ -70,15 +70,21 @@ on_err() {
 }
 
 #===============================================================================
-# program start
-#===============================================================================
 export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
-script_name="${0##*/}"
 
-trap on_err EXIT
-set -e
+script_name="${0##*/}"
+base_name="${script_name%.sh}"
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
+SECONDS=0
+
+trap "on_exit 'Failed'" EXIT
+#trap 'on_err ${FUNCNAME[0]} ${LINENO} ${?}' ERR
+set -eE
+set -o pipefail
+set -o nounset
 
 source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 source "${SCRIPTS_TOP}/lib/checkout.sh"
@@ -90,7 +96,6 @@ if [[ ${usage} ]]; then
 	trap - EXIT
 	exit 0
 fi
-
 
 seconds="XXX"
 checkout_query "${resource}" seconds

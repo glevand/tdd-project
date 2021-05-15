@@ -1,14 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
-script_name="${0##*/}"
-
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
-
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/checkout.sh"
-
 usage() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
@@ -22,6 +13,34 @@ usage() {
 	echo "  <token>      - Checkout reservation token" >&2
 	eval "${old_xtrace}"
 }
+
+on_exit() {
+	set +x
+	set +e
+
+	echo "${script_name}: token: ${token}"
+	echo "${script_name}: Done, failed." >&2
+}
+
+#===============================================================================
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
+
+script_name="${0##*/}"
+base_name="${script_name%.sh}"
+
+SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
+SECONDS=0
+
+trap 'on_exit' EXIT
+#trap 'on_err ${FUNCNAME[0]} ${LINENO} ${?}' ERR
+set -eE
+set -o pipefail
+set -o nounset
+
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+source "${SCRIPTS_TOP}/lib/checkout.sh"
 
 short_opts="hv"
 long_opts="help,verbose"
@@ -76,16 +95,6 @@ if [[ -n "${usage}" ]]; then
 	usage
 	exit 0
 fi
-
-on_err() {
-	set +x
-	set +e
-
-	echo "${script_name}: token: ${token}"
-	echo "${script_name}: Done, failed." >&2
-}
-
-trap on_err EXIT
 
 checkin "${token}"
 
