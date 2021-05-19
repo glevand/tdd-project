@@ -54,7 +54,7 @@ initrd:,\
 	eval set -- "${opts}"
 
 	while true ; do
-		#Secho "${FUNCNAME[0]}: @${1}@ @${2}@"
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
 		-h | --help)
 			usage=1

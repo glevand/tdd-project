@@ -204,6 +204,8 @@ fi
 case ${target_arch} in
 arm64|ppc*)
 	;;
+amd64)
+	;;
 *)
 	echo "${script_name}: ERROR: Unsupported target arch '${target_arch}'." >&2
 	exit 1
@@ -353,7 +355,7 @@ if [[ ${have_efi} ]]; then
 fi
 
 ls -l /dev/kvm || :
-cat /etc/group || :
+grep 'kvm' /etc/group || :
 id
 
 cmd="${qemu_exe} \
@@ -364,4 +366,7 @@ cmd="${qemu_exe} \
 	-append '${qemu_append_args}' \
 "
 
-eval exec "${cmd}"
+echo "${script_name}: INFO: Starting QEMU..." >&2
+echo "${cmd}" >&2
+
+#eval exec "${cmd}"

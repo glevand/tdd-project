@@ -42,7 +42,7 @@ while true ; do
 	-v | --verbose)
 		set -x
 		verbose=1
-		export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
+		export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
 		shift
 		;;
 	--)

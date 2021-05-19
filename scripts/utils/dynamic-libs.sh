@@ -23,7 +23,7 @@ process_opts() {
 	eval set -- "${opts}"
 
 	while true ; do
-		#echo "${FUNCNAME[0]}: @${1}@ @${2}@"
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
 		-h | --help)
 			usage=1
@@ -68,6 +68,15 @@ on_exit() {
 	echo "${script_name}: Done : ${result}." >&2
 }
 
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+	echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}" >&2
+	exit ${err_no}
+}
+
 print_paths() {
 	local name="${1}"
 	local paths="${2}"
@@ -86,7 +95,8 @@ print_paths() {
 }
 
 #===============================================================================
-export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
+
 script_name="${0##*/}"
 base_name="${script_name##*/%}"
 base_name="${base_name%.sh}"
@@ -96,9 +106,13 @@ SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 SECONDS=0
 
-trap "on_exit 'failed.'" EXIT
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+trap 'on_err SIGUSR1 ? 3' SIGUSR1
+
+set -eE
 set -o pipefail
-set -e
+set -o nounset
 
 source "${SCRIPTS_TOP}/../tdd-lib/util.sh"
 
@@ -118,12 +132,14 @@ fi
 
 src_path="$(realpath "${src_path}")"
 
-declare -a files
+declare -a files_array
 
 if [[ -d "${src_path}" ]]; then
-	readarray -t files < <(find "${src_path}" -type f | sort)
+	readarray -t files_array < <( find "${src_path}" -type f | sort \
+		|| { echo "${script_name}: ERROR: files_array_array find failed, function=${FUNCNAME[0]:-main}, line=${LINENO}, result=${?}" >&2; \
+		kill -SIGUSR1 $$; } )
 elif [[ -f "${src_path}" ]]; then
-	files="${src_path}"
+	files_array=("${src_path}")
 else
 	echo "${script_name}: ERROR: Source path not found: '${src_path}'" >&2
 	usage
@@ -142,7 +158,7 @@ rpath_regex="^[^(]+\(RPATH\) *(Library rpath: .+)$"
 
 runpath_regex="^[^(]+\(RUNPATH\) *(Library runpath: )\[(.+)\]$"
 
-for f in "${files[@]}"; do
+for f in "${files_array[@]}"; do
 	# f="${f//[$'\t\r\n ']}"
 	if data="$("${readelf}" -d "${f}" 2>/dev/null)"; then
 		echo "----------------------------"

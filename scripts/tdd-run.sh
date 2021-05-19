@@ -67,7 +67,7 @@ enter,build-kernel,build-bootstrap,build-rootfs,build-tests,run-tests"
 	eval set -- "${opts}"
 
 	while true ; do
-		#echo "${FUNCNAME[0]}: @${1}@ @${2}@"
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
 		--arch)
 			target_arch=$(get_arch "${2}")
@@ -488,7 +488,8 @@ run_tests() {
 #===============================================================================
 # program start
 #===============================================================================
-export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
+
 script_name="${0##*/}"
 
 trap "on_exit '[setup] failed.'" EXIT

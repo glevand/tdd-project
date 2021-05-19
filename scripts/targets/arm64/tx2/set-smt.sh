@@ -29,7 +29,7 @@ process_opts() {
 	eval set -- "${opts}"
 
 	while true ; do
-		#echo "${FUNCNAME[0]}: @${1}@ @${2}@"
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
 		-h | --help)
 			usage=1
@@ -176,7 +176,7 @@ dmidecode_cpu_count() {
 #===============================================================================
 # program start
 #===============================================================================
-PS4='\[\033[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}): \[\033[0;37m\]'
+PS4='\[\033[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}): \[\033[0;37m\]'
 
 script_name="${0##*/}"
 

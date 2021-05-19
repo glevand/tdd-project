@@ -25,7 +25,7 @@ process_opts() {
 	eval set -- "${opts}"
 
 	while true ; do
-		#echo "${FUNCNAME[0]}: @${1}@ @${2}@"
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
 		-A | --opt-A)
 			opt_A="${2}"
@@ -75,6 +75,15 @@ on_exit() {
 	echo "${script_name}: Done: ${result}, ${sec} sec." >&2
 }
 
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+	echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}" >&2
+	exit ${err_no}
+}
+
 check_top_dir() {
 	local top_dir="${1}"
 
@@ -91,15 +100,20 @@ check_top_dir() {
 	fi
 }
 #===============================================================================
-export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
+
 script_name="${0##*/}"
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 SECONDS=0
 
-trap "on_exit 'failed'" EXIT
-set -e
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+trap 'on_err SIGUSR1 ? 3' SIGUSR1
+
+set -eE
 set -o pipefail
+set -o nounset
 
 start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
@@ -117,7 +131,10 @@ check_top_dir "${top_dir}"
 
 for pattern in '[0-9][0-9].[0-9][0-9].[0-9][0-9]' '[0-9][0-9].[0-9][0-9].[0-9][0-9].*' '[0-9][0-9].[0-9][0-9].[0-9][0-9]-*'; do
 
-	readarray -t path_array < <(find "${top_dir}" -maxdepth 1 -type d -name "${pattern}" | sort)
+	readarray -t path_array < <( \
+		find "${top_dir}" -maxdepth 1 -type d -name "${pattern}" | sort \
+		|| { echo "${script_name}: ERROR: path_array find failed, function=${FUNCNAME[0]:-main}, line=${LINENO}, result=${?}" >&2; \
+		kill -SIGUSR1 $$; } )
 
 	in_count="${#path_array[@]}"
 

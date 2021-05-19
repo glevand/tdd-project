@@ -42,7 +42,7 @@ git-clone,configure,build,mk-image,sign-image"
 	fi
 
 	while true ; do
-		#echo "${FUNCNAME[0]}: @${1}@ @${2}@"
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
 		-h | --help)
 			usage=1
@@ -214,9 +214,8 @@ sign_image() {
 }
 
 #===============================================================================
-# program start
-#===============================================================================
-export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-"?"}):\[\e[0m\] '
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
+
 set -ex
 
 script_name="${0##*/}"
