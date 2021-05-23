@@ -128,8 +128,8 @@ on_exit() {
 	end_time="$(date)"
 	local sec="${SECONDS}"
 
-	if [ -d "${tmp_dir}" ]; then
-		rm -rf "${tmp_dir}"
+	if [ -d "${tmp_dir:-}" ]; then
+		rm -rf "${tmp_dir:?}"
 	fi
 
 	{
@@ -351,28 +351,11 @@ SECONDS=0
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 
-tmp_dir=''
+ccache='ccache '
 make_options=''
-ccache="ccache "
 stderr_out=''
 
-trap "on_exit 'Failed'" EXIT
-trap 'on_err ${FUNCNAME[0]} ${LINENO} ${?}' ERR
-
-set -eE
-set -o pipefail
-set -o nounset
-
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-
-cpus="$(cpu_count)"
-
-process_opts "${@}"
-
-toolchain_prefix="${toolchain_prefix:-$(default_toolchain_prefix "${target}")}"
-set_target_variables "${target}"
-
-targets="
+targets='
 	amd64
 	arm64
 	arm64_be
@@ -382,7 +365,10 @@ targets="
 	ppc64le
 	ps3
 	x86_64
-"
+'
+
+target_ops='defaults'
+
 ops="
 	all: fresh ${target_ops} install_image install_modules
 	build: ${target_ops}
@@ -403,18 +389,35 @@ ops="
 	xconfig
 "
 
+
+
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]} ${LINENO} ${?}' ERR
+
+set -eE
+set -o pipefail
+set -o nounset
+
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+
+cpus="$(cpu_count)"
+
+process_opts "${@}"
+
+toolchain_prefix="${toolchain_prefix:-$(default_toolchain_prefix "${target}")}"
+set_target_variables "${target}"
+
 if [[ ! ${build_dir} ]]; then
 	build_dir="$(pwd)/${target}-kernel-build"
 fi
 
-build_dir="$(realpath "${build_dir}")"
+build_dir="$(realpath -m "${build_dir}")"
 
 if [[ ! ${install_dir} ]]; then
 	install_dir="${build_dir%-*}-install"
 fi
 
-mkdir -p "${install_dir}"
-install_dir="$(realpath "${install_dir}")"
+install_dir="$(realpath -m "${install_dir}")"
 
 if [[ ! ${local_version} ]]; then
 	local_version="${kernel_src##*/}"
@@ -447,6 +450,8 @@ if [[ ${extra_args} ]]; then
 	exit 1
 fi
 
+mkdir -p "${build_dir}"
+mkdir -p "${install_dir}"
 rm -f "${stderr_out}"
 
 check_directory "${kernel_src}" "" "usage"
