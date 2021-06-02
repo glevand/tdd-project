@@ -4,50 +4,60 @@ usage() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-	echo "${script_name} - Run Linux kernel in QEMU." >&2
-	echo "Usage: ${script_name} [flags]" >&2
-	echo "Option flags:" >&2
-	echo "  -a --arch              - Target architecture. Default: '${target_arch}'." >&2
-	echo "  -c --kernel-cmd        - Kernel command line options. Default: '${kernel_cmd}'." >&2
-	echo "  -e --ether-mac         - QEMU Ethernet MAC. Default: '${ether_mac}'." >&2
-	echo "  -f --hostfwd-offset    - QEMU hostfwd port offset. Default: '${hostfwd_offset}'." >&2
-	echo "  -h --help              - Show this help and exit." >&2
-	echo "  -i --initrd            - Initrd image. Default: '${initrd}'." >&2
-	echo "  -k --kernel            - Kernel image. Default: '${kernel}'." >&2
-# TODO	echo "  -m --modules           - Kernel modules directory.  To mount over existing modules directory. Default: '${modules}'." >&2
-	echo "  -o --out-file          - stdout, stderr redirection file. Default: '${out_file}'." >&2
-	echo "  -s --systemd-debug     - Run systemd with debug options. Default: '${systemd_debug}'." >&2
-	echo "  -t --qemu-tap          - Use QEMU tap networking. Default: '${qemu_tap}'." >&2
-	echo "  -v --verbose           - Verbose execution." >&2
-	echo "  --hda                  - QEMU IDE hard disk image hda. Default: '${hda}'." >&2
-	echo "  --hdb                  - QEMU IDE hard disk image hdb. Default: '${hdb}'." >&2
-	echo "  --hdc                  - QEMU IDE hard disk image hdc. Default: '${hdc}'." >&2
-	echo "  --hda-boot             - Boot from disk image hda '${hda}'." >&2
-	echo "  --pid-file             - PID file. Default: '${pid_file}'." >&2
-	echo "  --p9-share             - Plan9 share directory. Default: '${p9_share}'." >&2
+
+	{
+		echo "${script_name} - Run Linux in QEMU."
+		echo "Usage: ${script_name} [flags]"
+		echo "Option flags:"
+		echo "  -a --arch           - Target architecture. Default: '${target_arch}'."
+		echo "  -c --kernel-cmd     - Kernel command line options. Default: '${kernel_cmd}'."
+		echo "  -e --ether-mac      - QEMU Ethernet MAC. Default: '${ether_mac}'."
+		echo "  -f --hostfwd-offset - QEMU hostfwd port offset. Default: '${hostfwd_offset}'."
+		echo "  -i --initrd         - Initrd image. Default: '${initrd}'."
+		echo "  -k --kernel         - Kernel image. Default: '${kernel}'."
+# TODO		echo "  -m --modules        - Kernel modules directory.  To mount over existing modules directory. Default: '${modules}'."
+		echo "  -o --out-file       - stdout, stderr redirection file. Default: '${out_file}'."
+		echo "  -s --systemd-debug  - Run systemd with debug options. Default: '${systemd_debug}'."
+		echo "  -t --qemu-tap       - Use QEMU tap networking. Default: '${qemu_tap}'."
+		echo "  --hda               - QEMU IDE hard disk image hda. Default: '${hda}'."
+		echo "  --hdb               - QEMU IDE hard disk image hdb. Default: '${hdb}'."
+		echo "  --hdc               - QEMU IDE hard disk image hdc. Default: '${hdc}'."
+		echo "  --cdrom             - CDROM disk image. Default: '${cdrom}'."
+		echo "  --efi-vars          - QEMU EFI variables image. Default: '${efi_vars}'."
+		echo "  --hda-boot          - Boot from disk image hda. Default: '${hda_boot}'."
+		echo "  --cdrom-boot        - Boot from CDROM disk image. Default: '${cdrom_boot}'."
+		echo "  --pid-file          - PID file. Default: '${pid_file}'."
+		echo "  --p9-share          - Plan9 share directory. Default: '${p9_share}'."
+		echo "  --nographic         - Pass -nographic to QEMU. Default: '${nographic}'."
+		echo "  -h --help           - Show this help and exit."
+		echo "  -v --verbose        - Verbose execution."
+		echo "  -g --debug          - Extra verbose execution."
+		echo "  -d --dry-run        - Dry run, don't run qemu."
+		echo "Info:"
+		echo "  ${script_name} (@PACKAGE_NAME@) version @PACKAGE_VERSION@"
+		echo "  @PACKAGE_URL@"
+		echo "  Send bug reports to: Geoff Levand <geoff@infradead.org>."
+	} >&2
+
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="a:c:e:f:hi:k:m:o:r:stv"
-	local long_opts="arch:,kernel-cmd:,ether-mac:,hostfwd-offset:,help,initrd:,\
-kernel:,modules:,out-file:,systemd-debug,qemu-tap,verbose,\
-hda:,hdb:,hdc:,hda-boot,pid-file:,p9-share:"
+	local short_opts="a:c:e:f:i:k:m:o:r:sthvgd"
+	local long_opts="arch:,kernel-cmd:,ether-mac:,hostfwd-offset:,\
+initrd:,kernel:,modules:,out-file:,systemd-debug,qemu-tap,hda:,hdb:,hdc:,\
+cdrom:,efi-vars:,hda-boot,cdrom-boot,pid-file:,p9-share:,nographic,\
+help,verbose,debug,dry-run"
 
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
-
-	if [ $? != 0 ]; then
-		echo "${script_name}: ERROR: Internal getopt" >&2
-		exit 1
-	fi
 
 	eval set -- "${opts}"
 
 	while true ; do
 		case "${1}" in
 		-a | --arch)
-			target_arch=$(get_arch "${2}")
+			target_arch="$(get_arch "${2}")"
 			shift 2
 			;;
 		-c | --kernel-cmd)
@@ -61,10 +71,6 @@ hda:,hdb:,hdc:,hda-boot,pid-file:,p9-share:"
 		-f | --hostfwd-offset)
 			hostfwd_offset="${2}"
 			shift 2
-			;;
-		-h | --help)
-			usage=1
-			shift
 			;;
 		-i | --initrd)
 			initrd="${2}"
@@ -90,11 +96,6 @@ hda:,hdb:,hdc:,hda-boot,pid-file:,p9-share:"
 			qemu_tap=1
 			shift
 			;;
-		-v | --verbose)
-			set -x
-			verbose=1
-			shift
-			;;
 		--hda)
 			hda="${2}"
 			shift 2
@@ -107,8 +108,20 @@ hda:,hdb:,hdc:,hda-boot,pid-file:,p9-share:"
 			hdc="${2}"
 			shift 2
 			;;
+		--cdrom)
+			cdrom="${2}"
+			shift 2
+			;;
+		--efi-vars)
+			efi_vars="${2}"
+			shift 2
+			;;
 		--hda-boot)
 			hda_boot=1
+			shift
+			;;
+		--cdrom-boot)
+			cdrom_boot=1
 			shift
 			;;
 		--pid-file)
@@ -119,12 +132,35 @@ hda:,hdb:,hdc:,hda-boot,pid-file:,p9-share:"
 			p9_share="${2}"
 			shift 2
 			;;
+		--nographic)
+			nographic=1
+			shift
+			;;
+		-h | --help)
+			usage=1
+			shift
+			;;
+		-v | --verbose)
+			verbose=1
+			shift
+			;;
+		-g | --debug)
+			verbose=1
+			debug=1
+			set -x
+			shift
+			;;
+		-d | --dry-run)
+			dry_run=1
+			shift
+			;;
 		--)
 			shift
+			extra_args="${*}"
 			break
 			;;
 		*)
-			echo "${script_name}: ERROR: Internal opts: '${@}'" >&2
+			echo "${script_name}: ERROR: Internal opts: '${*}'" >&2
 			exit 1
 			;;
 		esac
@@ -149,46 +185,105 @@ setup_efi() {
 		;;
 	esac
 
+	check_file "${efi_code_src}" 'EFI code' ''
+	check_file "${efi_vars_src}" 'EFI variables' ''
+
 	efi_code="${efi_code_src}"
-	efi_vars="${target_arch}-EFI_VARS.fd"
 
-	check_file ${efi_code_src}
-	check_file ${efi_vars_src}
-
-	if [[ ! ${distro_test} ]]; then
-		copy_file ${efi_vars_src} ${efi_vars}
+	if [[ ! ${distro_test} && ! -e ${efi_vars} ]]; then
+		copy_file "${efi_vars_src}" "${efi_vars}"
 	fi
-
 }
 
 on_exit() {
 	local result=${1}
 
+	if [[ -d "${tmp_dir:-}" ]]; then
+		if [[ ${keep_tmp_dir:-} ]]; then
+			echo "${script_name}: INFO: tmp dir preserved: '${tmp_dir}'" >&2
+		else
+			rm -rf "${tmp_dir:?}"
+		fi
+	fi
+
+	set +x
 	echo "${script_name}: Done: ${result}" >&2
 }
 
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+	if [[ ${debug:-} ]]; then
+		echo '------------------------' >&2
+		set >&2
+		echo '------------------------' >&2
+	fi
+	echo "${script_name}: ERROR: (${err_no}) at ${f_name}:${line_no}." >&2
+	exit ${err_no}
+}
+
+
 #===============================================================================
-# program start
-#===============================================================================
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
+
 script_name="${0##*/}"
+base_name="${script_name##*/%}"
+base_name="${base_name%.sh*}"
 
-trap "on_exit 'failed.'" EXIT
-set -e
+SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
+SECONDS=0
+
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+set -eE
+set -o pipefail
+set -o nounset
+
 source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+
+host_arch=$(get_arch "$(uname -m)")
+target_arch="${host_arch}"
+kernel_cmd=''
+ether_mac='01:02:03:00:00:01'
+hostfwd_offset='20000'
+initrd=''
+kernel=''
+modules=''
+out_file=''
+systemd_debug=''
+qemu_tap=''
+hda=''
+hdb=''
+hdc=''
+cdrom=''
+efi_vars="$(pwd)/${target_arch}-EFI_VARS.fd"
+hda_boot=''
+cdrom_boot=''
+pid_file=''
+p9_share=''
+nographic=''
+usage=''
+verbose=''
+debug=''
+dry_run=''
+
+# TODO
+use_virtio_net=''
+disk_image=''
+distro_test=''
 
 process_opts "${@}"
 
 TARGET_HOSTNAME=${TARGET_HOSTNAME:-"tdd-tester"}
 
 MODULES_ID=${MODULES_ID:-"kernel_modules"}
-P9_SHARE_ID=${SHARE_ID:-"p9_share"}
+P9_SHARE_ID=${P9_SHARE_ID:-"p9_share"}
 
-host_arch=$(get_arch "$(uname -m)")
-target_arch=${target_arch:-"${host_arch}"}
-hostfwd_offset=${hostfwd_offset:-"20000"}
-ether_mac=${ether_mac:-"01:02:03:00:00:01"}
+qemu_append_args=''
 
 if [[ ${systemd_debug} ]]; then
 	# FIXME: need to run set-systemd-debug.sh???
@@ -199,6 +294,12 @@ if [[ -n "${usage}" ]]; then
 	usage
 	trap - EXIT
 	exit 0
+fi
+
+if [[ ${extra_args} ]]; then
+	echo "${script_name}: ERROR: Got extra args: '${extra_args}'" >&2
+	usage
+	exit 1
 fi
 
 case ${target_arch} in
@@ -212,14 +313,20 @@ amd64)
 	;;
 esac
 
-if [[ ! ${hda_boot} && ! ${kernel} ]] || [[ ${hda_boot} && ${kernel} ]]; then
-	echo "${script_name}: ERROR: Must provide either --kernel or --hda-boot option." >&2
+if (( (hda_boot + cdrom_boot + kernel) == 0 )); then
+	echo "${script_name}: ERROR: Must provide one of: --hda-boot, --cdrom-boot, or --kernel." >&2
 	usage
 	exit 1
 fi
 
-if [[ ${hda_boot} && ${initrd} ]]; then
-	echo "${script_name}: ERROR: Must provide either --initrd or --hda-boot option." >&2
+if (( (hda_boot + cdrom_boot + kernel) != 1 )); then
+	echo "${script_name}: ERROR: Must provide only one of: --hda-boot, --cdrom-boot, or --kernel." >&2
+	usage
+	exit 1
+fi
+
+if (( (hda_boot + cdrom_boot + initrd) != 1 )); then
+	echo "${script_name}: ERROR: Must provide only one of: --hda-boot, --cdrom-boot, or --initrd." >&2
 	usage
 	exit 1
 fi
@@ -284,45 +391,66 @@ else
 fi
 
 if [[ ${kernel} ]]; then
-	check_file "${kernel}"
+	check_file "${kernel}" ' --kernel' '1'
 	qemu_args+=" -kernel ${kernel}"
+	if [[ ${hda_boot} ]]; then
+		qemu_append_args+=" root=/dev/vda rw"
+	fi
 	qemu_append_args+=" ${kernel_cmd}"
 fi
 
 if [[ ${initrd} ]]; then
-	check_file "${initrd}"
+	check_file "${initrd}" ' --initrd' '1'
 	qemu_args+=" -initrd ${initrd}"
 fi
 
-if [[ ${hda_boot} ]]; then
-	root_partition="/dev/vda"
-	qemu_append_args+=" root=${root_partition} rw"
-fi
-
 if [[ ${hda} ]]; then
-	check_file "${hda}"
+	check_file "${hda}" ' --hda' '1'
 	qemu_args+=" -hda ${hda}"
 fi
 
 if [[ ${hdb} ]]; then
-	check_file "${hdb}"
+	check_file "${hdb}" ' --hdb' '1'
 	qemu_args+=" -hdb ${hdb}"
 fi
 
 if [[ ${hdc} ]]; then
-	check_file "${hdc}"
+	check_file "${hdc}" ' --hdc' '1'
 	qemu_args+=" -hdc ${hdc}"
 fi
 
+if [[ ${cdrom} ]]; then
+	check_file "${cdrom}" ' --cdrom' '1'
+	qemu_args+=" -cdrom ${cdrom}"
+fi
+
+if [[ ${hda_boot} ]]; then
+	if [[ ! ${hda} ]]; then
+		echo "${script_name}: ERROR: --hda-boot requires --hda'." >&2
+		usage
+		exit 1
+	fi
+	qemu_args+=" -boot c"
+fi
+
+if [[ ${cdrom_boot} ]]; then
+	if [[ ! ${cdrom} ]]; then
+		echo "${script_name}: ERROR: --cdrom-boot requires --cdrom'." >&2
+		usage
+		exit 1
+	fi
+	qemu_args+=" -boot d"
+fi
+
 if [[ ${p9_share} ]]; then
-	check_directory "${p9_share}"
+	check_directory "${p9_share}" ' --p9-share' '1'
 	qemu_args+=" \
 		-virtfs local,id=${P9_SHARE_ID},path=${p9_share},security_model=none,mount_tag=${P9_SHARE_ID}"
 	echo "${script_name}: INFO: 'mount -t 9p -o trans=virtio ${P9_SHARE_ID} <mount-point> -oversion=9p2000.L'" >&2
 fi
 
 if [[ ${modules} ]]; then
-	check_directory "${modules}"
+	check_directory "${modules}" ' --modules' '1'
 	qemu_args+=" \
 		-virtfs local,id=${MODULES_ID},path=${modules},security_model=none,mount_tag=${MODULES_ID}"
 fi
@@ -340,7 +468,9 @@ if [[ ${out_file} ]]; then
 		-chardev file,id=char0,path=${out_file} \
 		-serial chardev:char0 \
 	"
-else
+fi
+
+if [[ ${nographic} ]]; then
 	qemu_args+=" -nographic"
 fi
 
@@ -354,19 +484,35 @@ if [[ ${have_efi} ]]; then
 	qemu_args+=" -drive if=pflash,file=${efi_vars},format=raw"
 fi
 
-ls -l /dev/kvm || :
-grep 'kvm' /etc/group || :
-id
+if [[ ${verbose} ]]; then
+	{
+		ls -l /dev/kvm || :
+		grep 'kvm' /etc/group || :
+		id
+	} >&2
+fi
 
 cmd="${qemu_exe} \
 	-name tdd-vm \
 	-object rng-random,filename=/dev/urandom,id=rng0 \
 	-device virtio-rng-pci,rng=rng0 \
 	${qemu_args} \
-	-append '${qemu_append_args}' \
+	${qemu_append_args:+-append "'"${qemu_append_args}"'"} \
 "
 
 echo "${script_name}: INFO: Starting QEMU..." >&2
-echo "${cmd}" >&2
 
-#eval exec "${cmd}"
+if [[ ${dry_run} || ${verbose} ]]; then
+	{
+		echo '-------------------------'
+		echo "${cmd}"
+		echo '-------------------------'
+	} >&1
+fi
+
+if [[ ! ${dry_run} ]]; then
+	eval exec "${cmd}"
+fi
+
+trap "on_exit 'Success.'" EXIT
+exit 0
