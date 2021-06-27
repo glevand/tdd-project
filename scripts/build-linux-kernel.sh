@@ -51,16 +51,6 @@ process_opts() {
 	local long_opts="build-dir:,install-dir:,local-version:,\
 toolchain-prefix:,vbuild,help,verbose,debug"
 
-	build_dir=''
-	install_dir=''
-	local_version=''
-	toolchain_prefix=''
-	vbuild=''
-	usage=''
-	verbose=''
-	debug=''
-	extra_args=''
-
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
 
@@ -224,15 +214,19 @@ run_install_image() {
 	cp "${build_dir}/.config" "${install_dir}/boot/config"
 	"${toolchain_prefix}strip" -s -R .comment "${build_dir}/vmlinux" -o "${install_dir}/boot/vmlinux.strip"
 
-	if [[ -z "${target_copy}" ]]; then
+	if (( ${#target_copy[@]} == 0 )); then
 		run_cmd_tee "${make_cmd} ${make_options} install"
 	else
 		for ((i = 0; i <= ${#target_copy[@]} - 1; i += 2)); do
-			cp --no-dereference "${build_dir}/${target_copy[i]}" "${install_dir}/${target_copy[i+1]}"
+			if [[ -e "${build_dir}/${target_copy[i]}" ]]; then
+				cp --no-dereference "${build_dir}/${target_copy[i]}" "${install_dir}/${target_copy[i+1]}"
+			else
+				echo "${script_name}: INFO: target_copy file not found: '${build_dir}/${target_copy[i]}'" >&2
+			fi
 		done
 	fi
 
-	if [[ -n "${target_copy_extra}" ]]; then
+	if (( ${#target_copy_extra[@]} != 0 )); then
 		for ((i = 0; i <= ${#target_copy_extra[@]} - 1; i += 2)); do
 			if [[ -f "${target_copy_extra[i]}" ]]; then
 				cp --no-dereference "${build_dir}/${target_copy_extra[i]}" "${install_dir}/${target_copy_extra[i+1]}"
@@ -331,11 +325,10 @@ set_target_variables() {
 		target_defconfig="${target_defconfig:-${target}_defconfig}"
 		target_copy=(
 			vmlinux boot/
+			arch/powerpc/boot/otheros.bld boot/
 			arch/powerpc/boot/dtbImage.ps3.bin boot/linux
 		)
-		target_copy_extra=(
-			arch/powerpc/boot/otheros.bld boot/
-		)
+		target_copy_extra=()
 		target_ops='defaults'
 		;;
 	*)
@@ -357,10 +350,6 @@ SECONDS=0
 
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 
-ccache='ccache '
-make_options=''
-stderr_out=''
-
 targets='
 	amd64
 	arm64
@@ -377,6 +366,7 @@ target_ops='defaults'
 
 ops="
 	all: fresh ${target_ops} install_image install_modules
+	all-no-mod: fresh ${target_ops} install_image
 	build: ${target_ops}
 	build-install: ${target_ops} install_image install_modules
 	defconfig
@@ -395,8 +385,6 @@ ops="
 	xconfig
 "
 
-
-
 trap "on_exit 'Failed'" EXIT
 trap 'on_err ${FUNCNAME[0]} ${LINENO} ${?}' ERR
 
@@ -408,10 +396,27 @@ source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 
 cpus="$(cpu_count)"
 
+ccache="${ccache:-ccache }"
+
+build_dir=''
+install_dir=''
+local_version=''
+toolchain_prefix=''
+vbuild=''
+usage=''
+verbose=''
+debug=''
+extra_args=''
+
+make_options=''
+stderr_out=''
+
 process_opts "${@}"
 
 toolchain_prefix="${toolchain_prefix:-$(default_toolchain_prefix "${target}")}"
 set_target_variables "${target}"
+
+echo "target_copy count = '${#target_copy[@]}'"
 
 if [[ ! ${build_dir} ]]; then
 	build_dir="$(pwd)/${target}-kernel-build"
@@ -467,7 +472,7 @@ if [[ ! -f "${kernel_src}/Documentation/CodingStyle" ]]; then
 	exit 1
 fi
 
-progs="bc bison ccache flex ${toolchain_prefix}gcc"
+progs="bc bison ${ccache} flex ${toolchain_prefix}gcc"
 declare -A pairs=(
 	[libelf-dev]='/usr/include/libelf.h'
 	[libssl-dev]='/usr/include/openssl/evp.h'
@@ -523,6 +528,11 @@ all)
 	run_make_target_ops
 	run_install_image
 	run_install_modules
+	;;
+all-no-mod)
+	run_make_fresh
+	run_make_target_ops
+	run_install_image
 	;;
 build|targets)
 	run_make_target_ops
