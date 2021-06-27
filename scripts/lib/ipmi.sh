@@ -7,7 +7,7 @@ ipmi_get_power_status() {
 
 	#echo "*** ipmi_args = @${ipmi_args} @" >&2
 	local msg
-	msg="$(ipmitool ${ipmi_args} power status)"
+	msg="$("${ipmitool}" ${ipmi_args} power status)"
 
 	case ${msg: -3} in
 	' on')
@@ -49,7 +49,7 @@ ipmi_set_power_state() {
 
 	#echo "*** ipmi_args = @${ipmi_args} @" >&2
 
-	ipmitool ${ipmi_args} power ${state}
+	"${ipmitool}" ${ipmi_args} power ${state}
 	ipmi_wait_power_state "${ipmi_args}" "${state}" ${timeout_sec}
 }
 
