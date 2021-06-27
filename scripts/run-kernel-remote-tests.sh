@@ -1,46 +1,42 @@
 #!/usr/bin/env bash
 
-set -e
-
-script_name="${0##*/}"
-
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
-
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/ipmi.sh"
-source "${SCRIPTS_TOP}/lib/relay.sh"
-
 usage () {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-	echo "${script_name} - Run Linux kernel tests on remote machine." >&2
-	echo "Usage: ${script_name} [flags]" >&2
-	echo "Option flags:" >&2
-	echo "  -h --help           - Show this help and exit." >&2
-	echo "  -i --initrd         - Initrd image. Default: '${initrd}'." >&2
-	echo "  -k --kernel         - Kernel image. Default: '${kernel}'." >&2
-	echo "  -m --test-machine   - Test machine name. Default: '${test_machine}'." >&2
-	echo "  -n --no-known-hosts - Do not setup known_hosts file. Default: '${no_known_hosts}'." >&2
-	echo "  -o --out-file       - stdout, stderr redirection file. Default: '${out_file}'." >&2
-	echo "  -s --systemd-debug  - Run systemd with debug options. Default: '${systemd_debug}'." >&2
-	echo "  -v --verbose        - Verbose execution." >&2
-	echo "  --bmc-host          - Test machine BMC hostname or address. Default: '${bmc_host}'." >&2
-	echo "  --relay-server      - Relay server host[:port]. Default: '${relay_server}'." >&2
-	echo "  --result-file       - Result file. Default: '${result_file}'." >&2
-	echo "  --ssh-login-key     - SSH login private key file. Default: '${ssh_login_key}'." >&2
-	echo "  --test-name         - Tests name. Default: '${test_name}'." >&2
-	echo "  --tests-dir         - Test directory. Default: '${tests_dir}'." >&2
-	echo "  --tftp-triple       - tftp triple.  File name or 'user:server:root'. Default: '${tftp_triple}'." >&2
+	{
+		echo "${script_name} - Run Linux kernel tests on remote machine."
+		echo "Usage: ${script_name} [flags]"
+		echo "Option flags:"
+		echo "  -i --initrd         - Initrd image. Default: '${initrd}'."
+		echo "  -k --kernel         - Kernel image. Default: '${kernel}'."
+		echo "  -m --test-machine   - Test machine name. Default: '${test_machine}'."
+		echo "  -n --no-known-hosts - Do not setup known_hosts file. Default: '${no_known_hosts}'."
+		echo "  -o --out-file       - stdout, stderr redirection file. Default: '${out_file}'."
+		echo "  -s --systemd-debug  - Run systemd with debug options. Default: '${systemd_debug}'."
+		echo "  --bmc-host          - Test machine BMC hostname or address. Default: '${bmc_host}'."
+		echo "  --relay-server      - Relay server host[:port]. Default: '${relay_server}'."
+		echo "  --result-file       - Result file. Default: '${result_file}'."
+		echo "  --ssh-login-key     - SSH login private key file. Default: '${ssh_login_key}'."
+		echo "  --test-name         - Tests name. Default: '${test_name}'."
+		echo "  --tests-dir         - Test directory. Default: '${tests_dir}'."
+		echo "  --tftp-triple       - tftp triple.  File name or 'user:server:root'. Default: '${tftp_triple}'."
+		echo "  -h --help           - Show this help and exit."
+		echo "  -v --verbose        - Verbose execution. Default: '${verbose}'."
+		echo "  -g --debug          - Extra verbose execution. Default: '${debug}'."
+		echo "Info:"
+		echo '  @PACKAGE_NAME@ v@PACKAGE_VERSION@'
+		echo '  @PACKAGE_URL@'
+		echo "  Send bug reports to: Geoff Levand <geoff@infradead.org>."
+	} >&2
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="hi:k:m:no:sv"
-	local long_opts="help,initrd:,kernel:,test-machine:,no-known-hosts,\
-out-file:,systemd-debug,verbose,\
-bmc-host:,relay-server:,result-file:,ssh-login-key:,test-name:,tests-dir:,\
-tftp-triple:"
+	local short_opts="i:k:m:no:shvg"
+	local long_opts="initrd:,kernel:,test-machine:,no-known-hosts,out-file:\
+,systemd-debug,bmc-host:,relay-server:,result-file:,ssh-login-key:,test-name:,\
+tests-dir:,tftp-triple:,help,verbose,debug"
 
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
 
@@ -48,10 +44,6 @@ tftp-triple:"
 
 	while true ; do
 		case "${1}" in
-		-h | --help)
-			usage=1
-			shift
-			;;
 		-i | --initrd)
 			initrd="${2}"
 			shift 2
@@ -74,11 +66,6 @@ tftp-triple:"
 			;;
 		-s | --systemd-debug)
 			systemd_debug=1
-			shift
-			;;
-		-v | --verbose)
-			set -x
-			verbose=1
 			shift
 			;;
 		--bmc-host)
@@ -109,8 +96,24 @@ tftp-triple:"
 			tftp_triple="${2}"
 			shift 2
 			;;
+		-h | --help)
+			usage=1
+			shift
+			;;
+		-v | --verbose)
+			verbose=1
+			shift
+			;;
+		-g | --debug)
+			verbose=1
+			debug=1
+			keep_tmp_dir=1
+			set -x
+			shift
+			;;
 		--)
 			shift
+			extra_args="${*}"
 			break
 			;;
 		*)
@@ -123,10 +126,19 @@ tftp-triple:"
 
 on_exit() {
 	local result=${1}
-	local sol_pid
+	local sec="${SECONDS}"
+
+	if [[ -d "${tmp_dir}" ]]; then
+		if [[ ${keep_tmp_dir} ]]; then
+			echo "${script_name}: INFO: tmp dir preserved: '${tmp_dir}'" >&2
+		else
+			rm -rf "${tmp_dir:?}"
+		fi
+	fi
 
 	set +e
 
+	local sol_pid=''
 	if [[ -n "${sol_pid_file}" ]]; then
 		sol_pid=$(cat ${sol_pid_file})
 		rm -f ${sol_pid_file}
@@ -136,15 +148,19 @@ on_exit() {
 		rm -f ${test_kernel}
 	fi
 
-	local old_xtrace
-	old_xtrace="$(shopt -po xtrace || :)"
-	set +o xtrace
-	echo '*** on_exit ***'
-	echo "*** result      = @${result}@" >&2
-	echo "*** sol_pid_fil = @${sol_pid_file}@" >&2
-	echo "*** sol_pid     = @${sol_pid}@" >&2
-	echo "*** ipmi_args   = @${ipmi_args}@" >&2
-	eval "${old_xtrace}"
+	if [[ ${debug} ]]; then
+		local old_xtrace
+		old_xtrace="$(shopt -po xtrace || :)"
+		set +o xtrace
+		{
+			echo '*** on_exit ***'
+			echo "*** result      = @${result}@"
+			echo "*** sol_pid_fil = @${sol_pid_file}@"
+			echo "*** sol_pid     = @${sol_pid}@"
+			echo "*** ipmi_args   = @${ipmi_args}@"
+		} >&2
+		eval "${old_xtrace}"
+	fi
 
 	if [[ ${sol_pid} ]]; then
 		kill -0 ${sol_pid}
@@ -152,8 +168,8 @@ on_exit() {
 	fi
 
 	if [[ ${ipmi_args} ]]; then
-		ipmitool ${ipmi_args} -I lanplus sol deactivate || :
-		ipmitool ${ipmi_args} -I lanplus chassis power off || :
+		"${ipmitool}" ${ipmi_args} -I lanplus sol deactivate || :
+		"${ipmitool}" ${ipmi_args} -I lanplus chassis power off || :
 	fi
 
 	if [[ ${sol_pid} ]]; then
@@ -164,51 +180,115 @@ on_exit() {
 		${SCRIPTS_TOP}/checkin.sh ${checkout_token}
 	fi
 
-	echo "${script_name}: ${result}" >&2
+	set +x
+	echo "${script_name}: Done: ${result}, ${sec} sec." >&2
+}
+
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+	{
+		if [[ ${debug} ]]; then
+			echo '------------------------'
+			set
+			echo '------------------------'
+		fi
+
+		echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}"
+	} >&2
+
+	exit "${err_no}"
 }
 
 #===============================================================================
-# program start
-#===============================================================================
-sudo="sudo -S"
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
 
-trap "on_exit 'failed.'" EXIT
+script_name="${0##*/}"
+
+SECONDS=0
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
+
+SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+
+initrd=''
+kernel=''
+test_machine=''
+no_known_hosts=''
+out_file=${out_file:-"${test_machine}-${start_time}.out"}
+systemd_debug=''
+bmc_host=''
+relay_server=''
+result_file=${result_file:-"${test_machine}-${start_time}-result.txt"}
+ssh_login_key=''
+test_name=''
+tests_dir=''
+tftp_triple=''
+
+usage=''
+verbose=''
+debug=''
+
+keep_tmp_dir=''
+start_extra_args=''
+sol_pid=''
+
+sol_pid_file=''
+tmp_dir=''
+test_kernel=''
+ipmi_args=''
+checkout_token=''
+
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+trap 'on_err SIGUSR1 ? 3' SIGUSR1
+
+set -eE
+set -o pipefail
+set -o nounset
+
+source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+source "${SCRIPTS_TOP}/lib/ipmi.sh"
+source "${SCRIPTS_TOP}/lib/relay.sh"
+
+sudo="${sudo:-sudo -S}"
+ipmitool="${ipmitool:-ipmitool}"
 
 process_opts "${@}"
 
 host_arch=$(get_arch "$(uname -m)")
-start_extra_args=""
-out_file=${out_file:-"${test_machine}.out"}
-result_file=${result_file:-"${test_machine}-result.txt"}
 
-relay_triple=$(relay_init_triple ${relay_server})
-relay_token=$(relay_triple_to_token ${relay_triple})
+if [[ ${usage} ]]; then
+	usage
+	trap - EXIT
+	exit 0
+fi
 
 if [[ ! ${bmc_host} ]]; then
 	bmc_host="${test_machine}-bmc"
 	echo "${script_name}: INFO: BMC host: '${bmc_host}'" >&2
 fi
 
-if [[ ${usage} ]]; then
-	usage
-	exit 0
-fi
-
 check_opt 'test-machine' ${test_machine}
+check_opt 'relay-server' ${relay_server}
 
 check_opt 'kernel' ${kernel}
-check_file "${kernel}"
+check_file "${kernel}" 'kernel' ''
 
 check_opt 'initrd' ${initrd}
-check_file "${initrd}"
+check_file "${initrd}" 'initrd' ''
 
 check_opt 'ssh-login-key' ${ssh_login_key}
-check_file "${ssh_login_key}"
+check_file "${ssh_login_key}" 'ssh-login-key' ''
 
 check_opt 'test-name' ${test_name}
 
 check_opt 'tests-dir' ${tests_dir}
 check_directory "${tests_dir}"
+
+relay_triple=$(relay_init_triple ${relay_server})
+relay_token=$(relay_triple_to_token ${relay_triple})
 
 tmp_kernel=${kernel}.tmp
 test_kernel=${kernel}.${relay_token}
@@ -283,10 +363,10 @@ ping -c 1 -n ${bmc_host}
 ipmi_args="-H ${bmc_host} -U ${TDD_BMC_CREDS_USR} -E"
 
 mkdir -p ${out_file%/*}
-ipmitool ${ipmi_args} chassis status > ${out_file}
+"${ipmitool}" ${ipmi_args} chassis status > ${out_file}
 echo '-----' >> ${out_file}
 
-ipmitool ${ipmi_args} -I lanplus sol deactivate && result=1
+"${ipmitool}" ${ipmi_args} -I lanplus sol deactivate && result=1
 
 if [[ ${result} ]]; then
 	# wait for ipmitool to disconnect.
@@ -295,7 +375,7 @@ fi
 
 sol_pid_file="$(mktemp --tmpdir tdd-sol-pid.XXXX)"
 
-(echo "${BASHPID}" > ${sol_pid_file}; exec sleep 24h) | ipmitool ${ipmi_args} -I lanplus sol activate &>>"${out_file}" &
+(echo "${BASHPID}" > ${sol_pid_file}; exec sleep 24h) | "${ipmitool}" ${ipmi_args} -I lanplus sol activate &>>"${out_file}" &
 
 sol_pid=$(cat ${sol_pid_file})
 echo "sol_pid=${sol_pid}" >&2
