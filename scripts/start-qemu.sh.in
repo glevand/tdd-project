@@ -4,7 +4,6 @@ usage() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-
 	{
 		echo "${script_name} - Run Linux in QEMU."
 		echo "Usage: ${script_name} [flags]"
@@ -34,8 +33,8 @@ usage() {
 		echo "  -g --debug          - Extra verbose execution."
 		echo "  -d --dry-run        - Dry run, don't run qemu."
 		echo "Info:"
-		echo "  ${script_name} (@PACKAGE_NAME@) version @PACKAGE_VERSION@"
-		echo "  @PACKAGE_URL@"
+		echo '  @PACKAGE_NAME@ v@PACKAGE_VERSION@'
+		echo '  @PACKAGE_URL@'
 		echo "  Send bug reports to: Geoff Levand <geoff@infradead.org>."
 	} >&2
 
@@ -336,6 +335,7 @@ amd64--amd64)
 	have_efi=1
 	qemu_exe="qemu-system-x86_64"
 	qemu_args+=" -machine accel=kvm -cpu host -m 2048 -smp 2"
+	qemu_args+=" -device i6300esb,id=watchdog0 -watchdog-action reset"
 	;;
 arm64--amd64)
 	have_efi=1
