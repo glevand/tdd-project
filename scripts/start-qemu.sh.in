@@ -312,19 +312,14 @@ amd64)
 	;;
 esac
 
-if (( (hda_boot + cdrom_boot + kernel) == 0 )); then
-	echo "${script_name}: ERROR: Must provide one of: --hda-boot, --cdrom-boot, or --kernel." >&2
-	usage
-	exit 1
-fi
 
-if (( (hda_boot + cdrom_boot + kernel) != 1 )); then
+if [[ "${hda_boot:+1}${cdrom_boot:+1}${kernel:+1}" != '1' ]]; then
 	echo "${script_name}: ERROR: Must provide only one of: --hda-boot, --cdrom-boot, or --kernel." >&2
 	usage
 	exit 1
 fi
 
-if (( (hda_boot + cdrom_boot + initrd) != 1 )); then
+if [[ "${hda_boot:+1}${cdrom_boot:+1}${initrd:+1}" != '1' ]]; then
 	echo "${script_name}: ERROR: Must provide only one of: --hda-boot, --cdrom-boot, or --initrd." >&2
 	usage
 	exit 1
