@@ -86,6 +86,14 @@ process_opts() {
 on_exit() {
 	local result=${1}
 
+	if [[ -d "${tmp_dir:-}" ]]; then
+		if [[ ${keep_tmp_dir:-} ]]; then
+			echo "${script_name}: INFO: tmp dir preserved: '${tmp_dir}'" >&2
+		else
+			rm -rf "${tmp_dir:?}"
+		fi
+	fi
+
 	echo "${script_name}: ${result}" >&2
 }
 
@@ -135,6 +143,8 @@ if [[ ${tag} ]]; then
 	exit 0
 fi
 
+tmp_dir="$(mktemp --tmpdir --directory "${script_name}.XXXX")"
+
 declare -n server
 for server in "TDD_CHECKOUT_SERVER" "TDD_RELAY_SERVER" "TDD_TFTP_SERVER"; do
 	if [[ ! ${server} ]]; then
@@ -152,7 +162,19 @@ if ! echo "${docker_args}" | grep -q ' -w '; then
 	docker_extra_args+=" -v $(pwd):/work -w /work"
 fi
 
-if [[ ! ${as_root} ]]; then
+ansi_reset='\[\e[0m\]'
+ansi_red='\[\e[1;31m\]'
+ansi_green='\[\e[0;32m\]'
+ansi_blue='\[\e[0;34m\]'
+ansi_teal='\[\e[0;36m\]'
+
+cp "${HOME}/.bashrc" "${tmp_dir}/"
+echo "PS1='${ansi_green}\h@\${P_HOST}:${ansi_reset}\w\$ '" > "${tmp_dir}/.bashrc"
+
+if [[ ${as_root} ]]; then
+	docker_bash_args=" -v ${tmp_dir}/.bashrc:/root/.bashrc"
+else
+	docker_bash_args=" -v ${tmp_dir}/.bashrc:${HOME}/.bashrc"
 	docker_extra_args+=" \
 	-u $(id --user --real):$(id --group --real) \
 	-v ${HOME}/.ssh:${HOME}/.ssh:ro \
@@ -202,6 +224,8 @@ eval "docker run \
 	-e TDD_TFTP_SERVER \
 	-e TDD_TFTP_USER \
 	-e TDD_TFTP_ROOT \
+	-e 'P_HOST=$(hostname)' \
+	${docker_bash_args} \
 	${docker_kvm_args} \
 	${docker_extra_args} \
 	${docker_args} \
