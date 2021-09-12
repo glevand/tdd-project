@@ -247,6 +247,9 @@ default_toolchain_prefix() {
 	amd64)
 		echo "x86_64-linux-gnu-"
 		;;
+	arm32)
+		echo "arm-linux-gnueabi-"
+		;;
 	arm64|arm64_be)
 		echo "aarch64-linux-gnu-"
 		;;
@@ -281,6 +284,16 @@ set_target_variables() {
 		target_copy=(
 			vmlinux boot/
 			arch/x86/boot/bzImage boot/
+		)
+		target_copy_extra=()
+		target_ops='defaults'
+		;;
+	arm32)
+		target_make_options="ARCH=arm CROSS_COMPILE='${ccache}${toolchain_prefix}'"
+		target_defconfig="${target_defconfig:-defconfig}"
+		target_copy=(
+			vmlinux boot/
+			arch/arm/boot/Image boot/
 		)
 		target_copy_extra=()
 		target_ops='defaults'
@@ -352,6 +365,7 @@ SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 
 targets='
 	amd64
+	arm32
 	arm64
 	arm64_be
 	native
