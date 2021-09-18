@@ -479,7 +479,7 @@ mkdir -p "${build_dir}"
 mkdir -p "${install_dir}"
 rm -f "${stderr_out}"
 
-check_directory "${kernel_src}" "" "usage"
+check_directory "${kernel_src}" '' 'usage'
 
 if [[ ! -f "${kernel_src}/Documentation/CodingStyle" ]]; then
 	echo "${script_name}: ERROR: Check kernel sources: '${kernel_src}'" >&2

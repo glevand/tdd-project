@@ -70,8 +70,8 @@ test_build_kselftest() {
 	local target_triple="$(get_triple ${target_arch})"
 	local kernel_arch="$(kernel_arch ${target_arch})"
 
-	check_directory "${sysroot}"
-	check_directory "${kernel_src_dir}"
+	check_directory "${sysroot}" '' ''
+	check_directory "${kernel_src_dir}" '' ''
 
 	rm -rf ${tests_dir}
 

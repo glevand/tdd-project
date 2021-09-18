@@ -387,15 +387,15 @@ build_rootfs() {
 	local image_dir=${4}
 	local kernel_dir=${5}
 
-	check_directory "${bootstrap_dir}"
-	check_directory "${kernel_dir}"
+	check_directory "${bootstrap_dir}" '' ''
+	check_directory "${kernel_dir}" '' ''
 
 	rm -rf ${image_dir}
 	mkdir -p ${image_dir}
 
 	local modules
 	modules="$(find ${kernel_dir}/lib/modules/* -maxdepth 0 -type d)"
-	check_directory "${modules}"
+	check_directory "${modules}" '' ''
 
 	local extra_packages
 	extra_packages+="$(test_packages_${test_name//-/_} ${rootfs_type} ${target_arch})"
@@ -419,7 +419,7 @@ create_sysroot() {
 	local rootfs=${2}
 	local sysroot=${3}
 
-	check_directory "${rootfs}"
+	check_directory "${rootfs}" '' ''
 
 	mkdir -p ${sysroot}
 	${sudo} rsync -a --delete ${rootfs}/ ${sysroot}/
@@ -437,8 +437,8 @@ build_tests() {
 	local sysroot=${4}
 	local kernel_src=${5}
 
-	check_directory "${sysroot}"
-	check_directory "${kernel_src}"
+	check_directory "${sysroot}" '' ''
+	check_directory "${kernel_src}" '' ''
 
 	test_build_${test_name//-/_} ${rootfs_type} ${tests_dir} ${sysroot} \
 		${kernel_src}
@@ -453,10 +453,10 @@ run_tests() {
 	echo "${script_name}: run_tests: ${test_machine}" >&2
 
 	check_file ${kernel}
-	check_directory ${image_dir}
+	check_directory "${image_dir}" '' ''
 	check_file ${image_dir}/initrd
 	check_file ${image_dir}/login-key
-	check_directory ${tests_dir}
+	check_directory "${tests_dir}" '' ''
 
 	local test_script
 	local extra_args
@@ -553,7 +553,8 @@ if [[ ${linux_source} ]]; then
 	check_not_opt 'linux-source' 'linux-branch' ${linux_branch}
 	check_not_opt 'linux-source' 'linux-src-dir' ${linux_src_dir}
 
-	check_directory ${linux_source} "" "usage"
+	check_directory "${linux_source}" '' 'usage'
+
 	linux_src_dir="${linux_source}"
 else
 	linux_repo=${linux_repo:-"https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git"}
@@ -600,8 +601,10 @@ if [[ ${TDD_BUILDER} ]]; then
 		exit 1
 	fi
 else
-	check_directory ${TDD_PROJECT_ROOT} "" "usage"
-	check_directory ${TDD_TEST_ROOT} "" "usage"
+	check_directory "${TDD_PROJECT_ROOT}" '' 'usage'
+
+	check_directory "${TDD_TEST_ROOT}" '' 'usage'
+
 
 	${DOCKER_TOP}/builder/build-builder.sh
 

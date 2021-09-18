@@ -97,11 +97,11 @@ if [[ ${usage} ]]; then
 fi
 
 check_opt 'root-dir' "${root_dir}"
-check_directory "${root_dir}" "" "usage"
+check_directory "${root_dir}" '' 'usage'
 root_dir="$(realpath ${root_dir})"
 
 check_opt 'start-dir' "${start_dir}"
-check_directory "${start_dir}" "" "usage"
+check_directory "${start_dir}" '' 'usage'
 start_dir="$(realpath ${start_dir})"
 
 tmp_dir="$(mktemp --tmpdir --directory ${script_name}.XXXX)"

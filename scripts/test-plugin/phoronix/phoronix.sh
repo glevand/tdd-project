@@ -69,7 +69,7 @@ test_build_phoronix() {
 	local archive_file="${tests_dir}/${test_name}.tar.gz"
 	local results_file="${tests_dir}/${test_name}-results.tar.gz"
 
-	check_directory "${sysroot}"
+	check_directory "${sysroot}" '' ''
 	rm -rf ${archive_file} ${results_file}
 
 	curl --silent --show-error --location ${src_tar_url} > ${archive_file}
