@@ -4,31 +4,39 @@ usage() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-	echo "${script_name} - Builds a minimal Linux disk image." >&2
-	echo "Usage: ${script_name} [flags]" >&2
-	echo "Option flags:" >&2
-	echo "  -a --arch              - Target architecture. Default: '${target_arch}'." >&2
-	echo "  -c --clean-rootfs      - Delete bootstrap and rootfs directories. Default: ${clean_rootfs}" >&2
-	echo "  -h --help              - Show this help and exit." >&2
-	echo "  -i --output-disk-image - Output a binary disk image file '${disk_img}'." >&2
-	echo "  -t --rootfs-type       - Rootfs type {$(clean_ws ${known_rootfs_types})}." >&2
-	echo "                           Default: '${rootfs_type}'." >&2
-	echo "  -v --verbose           - Verbose execution." >&2
-	echo "  --bootstrap-dir        - Bootstrap directory. Default: '${bootstrap_dir}'." >&2
-	echo "  --image-dir            - Image output path. Default: '${image_dir}', ${rootfs_dir}', '${initrd}', '${disk_img}'." >&2
-	echo "Option steps:" >&2
-	echo "  -1 --bootstrap          - Run bootstrap rootfs step. Default: '${step_bootstrap}'." >&2
-	echo "  -2 --rootfs-setup       - Run rootfs setup step. Default: '${step_rootfs_setup}'." >&2
-	echo "    --kernel-modules      - Kernel modules to install. Default: '${kernel_modules}'." >&2
-	echo "    --extra-packages      - Extra distro packages. Default: '${extra_packages}'." >&2
-	echo "  -3 --make-image         - Run make image step. Default: '${step_make_image}'." >&2
+	{
+		echo "${script_name} - Builds a minimal Linux disk image."
+		echo "Usage: ${script_name} [flags]"
+		echo "Option flags:"
+		echo "  -a --arch              - Target architecture. Default: '${target_arch}'."
+		echo "  -c --clean-rootfs      - Delete bootstrap and rootfs directories. Default: ${clean_rootfs}"
+		echo "  -i --output-disk-image - Output a binary disk image file '${disk_img}'."
+		echo "  -t --rootfs-type       - Rootfs type {$(clean_ws ${known_rootfs_types})}."
+		echo "                           Default: '${rootfs_type}'."
+		echo "  --bootstrap-dir        - Bootstrap directory. Default: '${bootstrap_dir}'."
+		echo "  --image-dir            - Image output path. Defaults:"
+		echo "                         - Image directory: '${image_dir}'."
+		echo "                         - Root FS directory: '${rootfs_dir}'."
+		echo "                         - Initrd Image: '${initrd}'."
+		echo "                         - Disk Image: '${disk_img}'."
+		echo "  -h --help              - Show this help and exit."
+		echo "  -v --verbose           - Verbose execution. Default: '${verbose}'."
+		echo "  -g --debug             - Extra verbose execution. Default: '${debug}'."
+		echo "  -d --dry-run           - Dry run, don't run commands."
+		echo "Option steps:"
+		echo "  -1 --bootstrap         - Run bootstrap rootfs step. Default: '${step_bootstrap}'."
+		echo "  -2 --rootfs-setup      - Run rootfs setup step. Default: '${step_rootfs_setup}'."
+		echo "    --kernel-modules     - Kernel modules to install. Default: '${kernel_modules}'."
+		echo "    --extra-packages     - Extra distro packages. Default: '${extra_packages}'."
+		echo "  -3 --make-image        - Run make image step. Default: '${step_make_image}'."
+	} >&2
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="a:chit:v123"
-	local long_opts="arch:,clean-rootfs,help,output-disk-image,rootfs-type:,verbose,\
-bootstrap-dir:,image-dir:,\
+	local short_opts="a:cit:123hvgd"
+	local long_opts="arch:,clean-rootfs,output-disk-image,rootfs-type:,\
+bootstrap-dir:,image-dir:,help,verbose,debug,dry-run,\
 bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 
 	local opts
@@ -47,10 +55,6 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 			clean_rootfs=1
 			shift
 			;;
-		-h | --help)
-			usage=1
-			shift
-			;;
 		-i | --output-disk-image)
 			output_disk_image=1
 			shift
@@ -67,11 +71,6 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 			rootfs_type="${2}"
 			shift 2
 			;;
-		-v | --verbose)
-			set -x
-			verbose=1
-			shift
-			;;
 		--bootstrap-dir)
 			bootstrap_dir="${2}"
 			shift 2
@@ -79,6 +78,25 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 		--image-dir)
 			image_dir="${2}"
 			shift 2
+			;;
+		-h | --help)
+			usage=1
+			shift
+			;;
+		-v | --verbose)
+			verbose=1
+			shift
+			;;
+		-g | --debug)
+			verbose=1
+			debug=1
+			keep_tmp_dir=1
+			set -x
+			shift
+			;;
+		-d | --dry-run)
+			dry_run=1
+			shift
 			;;
 		-1 | --bootstrap)
 			step_bootstrap=1
@@ -94,6 +112,11 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 			;;
 		--)
 			shift
+			arg_1="${1:-}"
+			if [[ ${arg_1} ]]; then
+				shift
+			fi
+			extra_args="${*}"
 			break
 			;;
 		*)
@@ -105,9 +128,39 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 }
 
 on_exit() {
-	if [ -d ${tmp_dir} ]; then
-		"${sudo}" rm -rf "${tmp_dir:?}"
+	local result=${1}
+
+	local sec="${SECONDS}"
+
+	if [[ -d "${tmp_dir:-}" ]]; then
+		if [[ ${keep_tmp_dir:-} ]]; then
+			echo "${script_name}: INFO: tmp dir preserved: '${tmp_dir}'" >&2
+		else
+			rm -rf "${tmp_dir:?}"
+		fi
 	fi
+
+	set +x
+	echo "${script_name}: Done: ${result}, ${sec} sec." >&2
+}
+
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+	{
+		if [[ ${debug:-} ]]; then
+			echo '------------------------'
+			set
+			echo '------------------------'
+		fi
+
+		echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}"
+	} >&2
+
+	echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}"
+	exit "${err_no}"
 }
 
 on_fail() {
@@ -369,30 +422,54 @@ write_tdd_client_script() {
 }
 
 #===============================================================================
-# program start
-#===============================================================================
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
+
 script_name="${0##*/}"
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
-RELAY_TOP=${RELAY_TOP:-"$( cd "${SCRIPTS_TOP}/../relay" && pwd )"}
+SECONDS=0
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/chroot.sh"
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+trap 'on_err SIGUSR1 ? 3' SIGUSR1
 
-trap "on_exit" EXIT
-set -e
+set -eE
+set -o pipefail
+set -o nounset
 
-sudo="sudo -S"
+SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+RELAY_TOP="${RELAY_TOP:-$(realpath "${SCRIPT_TOP}/../relay")}"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/lib/chroot.sh"
+
+sudo='sudo -S'
+host_arch=$(get_arch "$(uname -m)")
+
+target_arch="${host_arch}"
+clean_rootfs=''
+output_disk_image=''
+kernel_modules=''
+extra_packages=''
+rootfs_type='debian'
+bootstrap_dir=''
+image_dir=''
+rootfs_dir=''
+usage=''
+verbose=''
+debug=''
+dry_run=''
+keep_tmp_dir=''
+step_bootstrap=''
+step_rootfs_setup=''
+step_make_image=''
 
 process_opts "${@}"
 
 TARGET_HOSTNAME=${TARGET_HOSTNAME:-"tdd-tester"}
 
-rootfs_type=${rootfs_type:-"debian"}
-source "${SCRIPTS_TOP}/rootfs-plugin/${rootfs_type}.sh"
-
-host_arch=$(get_arch "$(uname -m)")
-target_arch=${target_arch:-"${host_arch}"}
+source "${SCRIPT_TOP}/rootfs-plugin/rootfs-plugin.sh"
+source "${SCRIPT_TOP}/rootfs-plugin/${rootfs_type}.sh"
 
 image_dir=${image_dir:-"$(pwd)/${target_arch}-${rootfs_type}.image"}
 bootstrap_dir=${bootstrap_dir:-"${image_dir%.image}.bootstrap"}
@@ -406,10 +483,19 @@ login_key="${image_dir}/login-key"
 
 test_step_code
 
-if [ ${usage} ]; then
+if [[ ${usage} ]]; then
 	usage
+	trap - EXIT
 	exit 0
 fi
+
+if [[ ${extra_args} ]]; then
+	set +o xtrace
+	echo "${script_name}: ERROR: Got extra args: '${extra_args}'" >&2
+	usage
+	exit 1
+fi
+
 
 ${sudo} true
 
