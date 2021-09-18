@@ -8,36 +8,33 @@ usage() {
 		echo "${script_name} - Builds a minimal Linux disk image."
 		echo "Usage: ${script_name} [flags]"
 		echo "Option flags:"
-		echo "  -a --arch              - Target architecture. Default: '${target_arch}'."
-		echo "  -c --clean-rootfs      - Delete bootstrap and rootfs directories. Default: ${clean_rootfs}"
-		echo "  -i --output-disk-image - Output a binary disk image file '${disk_img}'."
-		echo "  -t --rootfs-type       - Rootfs type {$(clean_ws ${known_rootfs_types})}."
-		echo "                           Default: '${rootfs_type}'."
-		echo "  --bootstrap-dir        - Bootstrap directory. Default: '${bootstrap_dir}'."
-		echo "  --image-dir            - Image output path. Defaults:"
-		echo "                         - Image directory: '${image_dir}'."
-		echo "                         - Root FS directory: '${rootfs_dir}'."
-		echo "                         - Initrd Image: '${initrd}'."
-		echo "                         - Disk Image: '${disk_img}'."
-		echo "  -h --help              - Show this help and exit."
-		echo "  -v --verbose           - Verbose execution. Default: '${verbose}'."
-		echo "  -g --debug             - Extra verbose execution. Default: '${debug}'."
-		echo "  -d --dry-run           - Dry run, don't run commands."
+		echo "  -a --arch           - Target architecture {$(clean_ws ${known_arches})}. Default: '${target_arch}'."
+		echo "  -t --rootfs-type    - Rootfs type {$(clean_ws ${known_rootfs_types})}. Default: '${rootfs_type}'."
+		echo "  -c --clean-rootfs   - Remove bootstrap and rootfs directories. Default: '${clean_rootfs}'"
+		echo "  -i --disk-image     - Generate a binary disk image file: '${output_disk_image}'."
+		echo "  --bootstrap-dir     - Bootstrap directory. Default: '${bootstrap_dir}'."
+		echo "  --output-dir        - Output directory:   '${output_dir}'."
+		echo "                         Root FS:           '${rootfs_dir}'."
+		echo "                         Initrd:            '${initrd}'."
+		echo "                         Binary Disk Image: '${disk_img}'."
+		echo "  -h --help           - Show this help and exit."
+		echo "  -v --verbose        - Verbose execution. Default: '${verbose}'."
+		echo "  -g --debug          - Extra verbose execution. Default: '${debug}'."
+		echo "  -d --dry-run        - Dry run, don't run commands."
 		echo "Option steps:"
-		echo "  -1 --bootstrap         - Run bootstrap rootfs step. Default: '${step_bootstrap}'."
-		echo "  -2 --rootfs-setup      - Run rootfs setup step. Default: '${step_rootfs_setup}'."
-		echo "    --kernel-modules     - Kernel modules to install. Default: '${kernel_modules}'."
-		echo "    --extra-packages     - Extra distro packages. Default: '${extra_packages}'."
-		echo "  -3 --make-image        - Run make image step. Default: '${step_make_image}'."
+		echo "  -1 --bootstrap      - Run bootstrap rootfs step. Default: '${step_bootstrap}'."
+		echo "  -2 --rootfs-setup   - Run rootfs setup step. Default: '${step_rootfs_setup}'."
+		echo "     --kernel-modules - Kernel modules to install. Default: '${kernel_modules}'."
+		echo "     --extra-packages - Extra distro packages. Default: '${extra_packages}'."
+		echo "  -3 --make-image     - Run make image step. Default: '${step_make_image}'."
 	} >&2
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="a:cit:123hvgd"
-	local long_opts="arch:,clean-rootfs,output-disk-image,rootfs-type:,\
-bootstrap-dir:,image-dir:,help,verbose,debug,dry-run,\
-bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
+	local short_opts="a:t:ci123hvgd"
+	local long_opts="arch:,rootfs-type:,clean-rootfs,disk-image,bootstrap-dir:,output-dir:,\
+bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image,help,verbose,debug,dry-run"
 
 	local opts
 	opts=$(getopt --options "${short_opts}" --long "${long_opts}" -n "${script_name}" -- "${@}")
@@ -51,11 +48,15 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 			target_arch=$(get_arch "${2}")
 			shift 2
 			;;
+		-t | --rootfs-type)
+			rootfs_type="${2}"
+			shift 2
+			;;
 		-c | --clean-rootfs)
 			clean_rootfs=1
 			shift
 			;;
-		-i | --output-disk-image)
+		-i | --disk-image)
 			output_disk_image=1
 			shift
 			;;
@@ -67,17 +68,25 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 			extra_packages="${2}"
 			shift 2
 			;;
-		-t | --rootfs-type)
-			rootfs_type="${2}"
-			shift 2
-			;;
 		--bootstrap-dir)
 			bootstrap_dir="${2}"
 			shift 2
 			;;
-		--image-dir)
-			image_dir="${2}"
+		--output-dir)
+			output_dir="${2}"
 			shift 2
+			;;
+		-1 | --bootstrap)
+			step_bootstrap=1
+			shift
+			;;
+		-2 | --rootfs-setup)
+			step_rootfs_setup=1
+			shift
+			;;
+		-3 | --make-image)
+			step_make_image=1
+			shift
 			;;
 		-h | --help)
 			usage=1
@@ -98,24 +107,8 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image"
 			dry_run=1
 			shift
 			;;
-		-1 | --bootstrap)
-			step_bootstrap=1
-			shift
-			;;
-		-2 | --rootfs-setup)
-			step_rootfs_setup=1
-			shift
-			;;
-		-3 | --make-image)
-			step_make_image=1
-			shift
-			;;
 		--)
 			shift
-			arg_1="${1:-}"
-			if [[ ${arg_1} ]]; then
-				shift
-			fi
 			extra_args="${*}"
 			break
 			;;
@@ -149,17 +142,15 @@ on_err() {
 	local line_no=${2}
 	local err_no=${3}
 
-	{
-		if [[ ${debug:-} ]]; then
-			echo '------------------------'
-			set
-			echo '------------------------'
-		fi
+# 	{
+# 		if [[ ${debug:-} ]]; then
+# 			echo '------------------------'
+# 			set
+# 			echo '------------------------'
+# 		fi
+# 	} >&2
 
-		echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}"
-	} >&2
-
-	echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}"
+	echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}" >&2
 	exit "${err_no}"
 }
 
@@ -169,36 +160,36 @@ on_fail() {
 
 	echo "${script_name}: Step ${current_step}: FAILED." >&2
 
-	cleanup_chroot ${chroot}
+	cleanup_chroot "${chroot}"
 
-	${sudo} chown -R $(id --user --real --name): ${chroot}
+	${sudo} chown -R $(id --user --real --name): "${chroot}"
 
-	if [ -d "${mnt}" ]; then
+	if [[ -d "${mnt}" ]]; then
 		clean_make_disk_img "${mnt}"
 		rm -rf "${mnt}"
 	fi
 
-	if [ -d ${tmp_dir} ]; then
-		"${sudo}" rm -rf "${tmp_dir:?}"
+	if [[ -d "${tmp_dir}" ]]; then
+		${sudo} rm -rf "${tmp_dir:?}"
 	fi
 
-	if [ ${need_clean_rootfs} ]; then
-		${sudo} rm -rf ${chroot}
+	if [[ ${need_clean_rootfs} ]]; then
+		${sudo} rm -rf "${chroot}"
 	fi
 
-	on_exit
+	on_exit 'Failed'
 }
 
 check_kernel_modules() {
 	local dir=${1}
 
-	if [ ${dir} ]; then
-		if [ ! -d "${dir}" ]; then
+	if [[ ${dir} ]]; then
+		if [[ ! -d "${dir}" ]]; then
 			echo "${script_name}: ERROR: <kernel-modules> directory not found: '${dir}'" >&2
 			usage
 			exit 1
 		fi
-		if [ "$(basename $(cd ${dir}/.. && pwd))" != "modules" ]; then
+		if [[ "$(basename $(cd ${dir}/.. && pwd))" != "modules" ]]; then
 			echo "${script_name}: ERROR: No kernel modules found in '${dir}'" >&2
 			usage
 			exit 1
@@ -290,11 +281,13 @@ setup_ssh_keys() {
 
 	${sudo} mkdir -p -m0700 "${rootfs}/root/.ssh"
 
-	ssh-keygen -q -f ${key_file} -N ''
+	ssh-keygen -q -f "${key_file}" -N ''
 	cat "${key_file}.pub" | sudo_append "${rootfs}/root/.ssh/authorized_keys"
 
-	for key in ${HOME}/.ssh/id_*.pub; do
-		[ -f "${key_file}" ] || continue
+	for key in "${HOME}"/.ssh/id_*.pub; do
+		if [[ ! -f "${key_file}" ]]; then
+			continue
+		fi
 		cat "${key_file}" | sudo_append "${rootfs}/root/.ssh/authorized_keys"
 		local found=1
 	done
@@ -304,21 +297,23 @@ setup_kernel_modules() {
 	local rootfs=${1}
 	local src=${2}
 
-	if [ ! ${src} ]; then
+	if [[ ! ${src} ]]; then
 		echo "${script_name}: WARNING: No kernel modules provided." >&2
 		return
 	fi
 
-	local dest="${rootfs}/lib/modules/${src##*/}"
+	local dest
+	dest="${rootfs}/lib/modules/${src##*/}"
 
-	if [ ${verbose} ]; then
+	if [[ ${verbose} ]]; then
 		local extra='-v'
 	fi
 
-	${sudo} mkdir -p ${dest}
+	${sudo} mkdir -p "${dest}"
 	${sudo} rsync -av --delete ${extra} \
 		--exclude '/build' --exclude '/source' \
-		${src}/ ${dest}/
+		"${src}/" "${dest}/"
+
 	echo "${script_name}: INFO: Kernel modules size: $(directory_size_human ${dest})"
 }
 
@@ -326,34 +321,34 @@ setup_password() {
 	local rootfs=${1}
 	local pw=${2}
 
-	pw=${pw:-"r"}
+	pw="${pw:-"r"}"
 	echo "${script_name}: INFO: Login password = '${pw}'." >&2
 
 	local i
 	local hash
 	for ((i = 0; ; i++)); do
-		hash="$(openssl passwd -1 -salt tdd${i} ${pw})"
-		if [ "${hash/\/}" == "${hash}" ]; then
+		hash="$(openssl passwd -1 -salt tdd${i} "${pw}")"
+		if [[ "${hash/\/}" == "${hash}" ]]; then
 			break
 		fi
 	done
 
 	${sudo} sed --in-place "s/root:x:0:0/root:${hash}:0:0/" \
-		${rootfs}/etc/passwd
+		"${rootfs}/etc/passwd"
 	${sudo} sed --in-place '/^root:.*/d' \
-		${rootfs}/etc/shadow
+		"${rootfs}/etc/shadow"
 }
 
 delete_rootfs() {
 	local rootfs=${1}
 
-	${sudo} rm -rf ${rootfs}
+	rm -rf "${rootfs:?}"
 }
 
 clean_make_disk_img() {
 	local mnt=${1}
 
-	${sudo} umount ${mnt} || :
+	${sudo} umount "${mnt}" || :
 }
 
 make_disk_img() {
@@ -363,41 +358,41 @@ make_disk_img() {
 
 	tmp_img="${tmp_dir}/tdd-disk.img"
 
-	dd if=/dev/zero of=${tmp_img} bs=1M count=1536
-	mkfs.ext4 ${tmp_img}
+	dd if='/dev/zero' of="${tmp_img}" bs=1M count=1536
+	mkfs.ext4 "${tmp_img}"
 
-	mkdir -p ${mnt}
+	mkdir -p "${mnt}"
 
-	${sudo} mount  ${tmp_img} ${mnt}
-	${sudo} cp -a ${rootfs}/* ${mnt}
+	${sudo} mount  "${tmp_img}" "${mnt}"
+	${sudo} cp -a "${rootfs}"/* "${mnt}"
 
-	${sudo} umount ${mnt} || :
-	cp ${tmp_img} ${img}
-	rm -f  ${tmp_img}
+	${sudo} umount "${mnt}" || :
+	cp "${tmp_img}" "${img}"
+	rm -f "${tmp_img}"
 }
 
 make_ramfs() {
 	local fs=${1}
 	local out_file=${2}
 
-	(cd ${fs} && ${sudo} find . | ${sudo} cpio --create --format='newc' --owner=root:root | gzip) > ${out_file}
+	(cd "${fs}" && ${sudo} find . | ${sudo} cpio --create --format='newc' --owner=root:root | gzip) > "${out_file}"
 }
 
 make_manifest() {
 	local rootfs=${1}
 	local out_file=${2}
 
-	(cd ${rootfs} && ${sudo} find . -ls | sort --key=11) > ${out_file}
+	(cd "${rootfs}" && ${sudo} find . -ls | sort --key=11) > "${out_file}"
 }
 
 print_usage_summary() {
 	local rootfs_dir=${1}
 	local kernel_modules=${2}
 
-	rootfs_size="$(directory_size_bytes ${rootfs_dir})"
+	rootfs_size="$(directory_size_bytes "${rootfs_dir}")"
 	rootfs_size="$(bc <<< "${rootfs_size} / 1048576")"
 
-	modules_size="$(directory_size_bytes ${kernel_modules})"
+	modules_size="$(directory_size_bytes "${kernel_modules}")"
 	modules_size="$(bc <<< "${modules_size} / 1048576")"
 
 	base_size="$(bc <<< "${rootfs_size} - ${modules_size}")"
@@ -405,9 +400,13 @@ print_usage_summary() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-	echo "${script_name}: INFO: Base size:    ${base_size} MiB"
-	echo "${script_name}: INFO: Modules size: ${modules_size} MiB"
-	echo "${script_name}: INFO: Total size:   ${rootfs_size} MiB"
+
+	{
+		echo "${script_name}: INFO: Base size:    ${base_size} MiB"
+		echo "${script_name}: INFO: Modules size: ${modules_size} MiB"
+		echo "${script_name}: INFO: Total size:   ${rootfs_size} MiB"
+	} >&1
+
 	eval "${old_xtrace}"
 }
 
@@ -415,7 +414,7 @@ write_tdd_client_script() {
 	local out_file=${1}
 	local timeout=${2:-241}
 
-	sudo cp -vf ${RELAY_TOP}/tdd-relay-client.sh "${out_file}"
+	sudo cp -vf "${RELAY_TOP}/tdd-relay-client.sh" "${out_file}"
 	sudo sed --in-place "{s/@@timeout@@/${timeout}/}" "${out_file}"
 
 	${sudo} chmod u+x "${out_file}"
@@ -444,7 +443,7 @@ source "${SCRIPT_TOP}/tdd-lib/util.sh"
 source "${SCRIPT_TOP}/lib/chroot.sh"
 
 sudo='sudo -S'
-host_arch=$(get_arch "$(uname -m)")
+host_arch="$(get_arch "$(uname -m)")"
 
 target_arch="${host_arch}"
 clean_rootfs=''
@@ -453,7 +452,7 @@ kernel_modules=''
 extra_packages=''
 rootfs_type='debian'
 bootstrap_dir=''
-image_dir=''
+output_dir="$(realpath "$(pwd)/${target_arch}-${rootfs_type}-rootfs")"
 rootfs_dir=''
 usage=''
 verbose=''
@@ -466,15 +465,16 @@ step_make_image=''
 
 process_opts "${@}"
 
-TARGET_HOSTNAME=${TARGET_HOSTNAME:-"tdd-tester"}
+TARGET_HOSTNAME="${TARGET_HOSTNAME:-"tdd-tester"}"
 
 source "${SCRIPT_TOP}/rootfs-plugin/rootfs-plugin.sh"
 source "${SCRIPT_TOP}/rootfs-plugin/${rootfs_type}.sh"
 
-image_dir=${image_dir:-"$(pwd)/${target_arch}-${rootfs_type}.image"}
-bootstrap_dir=${bootstrap_dir:-"${image_dir%.image}.bootstrap"}
+output_dir="$(realpath -m "${output_dir}")"
+image_dir="$(realpath -m "${output_dir}/${target_arch}-${rootfs_type}.image")"
+bootstrap_dir="${bootstrap_dir:-$(realpath -m "${output_dir}/${target_arch}-${rootfs_type}.bootstrap")}"
 
-image_rootfs="${image_dir}/rootfs"
+rootfs_dir="${image_dir}/rootfs"
 disk_img="${image_dir}/disk.img"
 initrd="${image_dir}/initrd"
 manifest="${image_dir}/manifest"
@@ -496,95 +496,101 @@ if [[ ${extra_args} ]]; then
 	exit 1
 fi
 
-
 ${sudo} true
 
-cleanup_chroot ${image_rootfs}
-cleanup_chroot ${bootstrap_dir}
+cleanup_chroot "${rootfs_dir}"
+cleanup_chroot "${bootstrap_dir}"
 
 tmp_dir="$(mktemp --tmpdir --directory ${script_name}.XXXX)"
+need_clean_rootfs=''
 
-if [ ${step_bootstrap} ]; then
+if [[ ${step_bootstrap} ]]; then
 	current_step="bootstrap"
+
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
 
-	sudo rm -rf ${bootstrap_dir}
-	mkdir -p ${bootstrap_dir}
+	sudo rm -rf "${bootstrap_dir}"
+	mkdir -p "${bootstrap_dir}"
 
 	trap "on_fail ${bootstrap_dir} none" EXIT
-	bootstrap_rootfs ${bootstrap_dir}
-	${sudo} chown -R $(id --user --real --name): ${bootstrap_dir}
+	bootstrap_rootfs "${bootstrap_dir}"
+	${sudo} chown -R $(id --user --real --name): "${bootstrap_dir}"
 
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Done (${bootstrap_dir})." >&2
 	echo "${script_name}: INFO: Bootstrap size: $(directory_size_human ${bootstrap_dir})"
 fi
 
-if [ ${step_rootfs_setup} ]; then
-	current_step="rootfs_setup"
+if [[ ${step_rootfs_setup} ]]; then
+	current_step='rootfs_setup'
+
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
 	echo "${script_name}: INFO: Step ${current_step}: Using ${bootstrap_dir}." >&2
 
-	check_directory "${bootstrap_dir}"
-	check_directory "${bootstrap_dir}/usr/bin"
+	check_directory "${bootstrap_dir}" '' ''
+	check_directory "${bootstrap_dir}/usr/bin" '' ''
 
-	check_directory ${kernel_modules}
-	check_kernel_modules ${kernel_modules}
+	check_directory "${kernel_modules}" '' ''
+	check_kernel_modules "${kernel_modules}"
 
-	trap "on_fail ${image_rootfs} none" EXIT
+	trap "on_fail ${rootfs_dir} none" EXIT
 
-	mkdir -p ${image_rootfs}
-	${sudo} rsync -a --delete ${bootstrap_dir}/ ${image_rootfs}/
+	mkdir -p "${rootfs_dir}"
+	${sudo} rsync -a --delete "${bootstrap_dir}/" "${rootfs_dir}/"
 
-	setup_packages ${image_rootfs} $(get_default_packages) ${extra_packages}
+	setup_packages "${rootfs_dir}" "$(get_default_packages) ${extra_packages}"
 
-	setup_initrd_boot ${image_rootfs}
-	setup_login ${image_rootfs}
-	setup_network ${image_rootfs}
-	setup_sshd ${image_rootfs} ${server_key}
-	setup_ssh_keys ${image_rootfs} ${login_key}
-	setup_kernel_modules ${image_rootfs} ${kernel_modules}
-	setup_relay_client ${image_rootfs}
+	setup_initrd_boot "${rootfs_dir}"
+	setup_login "${rootfs_dir}" ''
+	setup_network "${rootfs_dir}"
+	setup_sshd "${rootfs_dir}" "${server_key}"
+	setup_ssh_keys "${rootfs_dir}" "${login_key}"
+	setup_kernel_modules "${rootfs_dir}" "${kernel_modules}"
+	setup_relay_client "${rootfs_dir}"
 
-	rootfs_cleanup ${image_rootfs}
+	rootfs_cleanup "${rootfs_dir}"
 
-	${sudo} chown -R $(id --user --real --name): ${image_rootfs}
+	${sudo} chown -R $(id --user --real --name): "${rootfs_dir}"
 
-	print_usage_summary ${image_rootfs} ${kernel_modules}
+	print_usage_summary "${rootfs_dir}" "${kernel_modules}"
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): done." >&2
 fi
 
-if [ ${step_make_image} ]; then
-	current_step="make_image"
+if [[ ${step_make_image} ]]; then
+	current_step='make_image'
+
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
 
-	check_directory ${image_rootfs}
+	check_directory "${rootfs_dir}" '' ''
 
-	if [ ${output_disk_image} ]; then
+	if [[ ${output_disk_image} ]]; then
 		tmp_mnt="${tmp_dir}/tdd-disk-mnt"
-		trap "on_fail ${image_rootfs} ${tmp_mnt}" EXIT
-		make_disk_img ${image_rootfs} ${disk_img} ${tmp_mnt}
-		trap "on_fail ${image_rootfs} none" EXIT
+		trap "on_fail ${rootfs_dir} ${tmp_mnt}" EXIT
+		make_disk_img "${rootfs_dir}" ${disk_img} ${tmp_mnt}
+		trap "on_fail ${rootfs_dir} none" EXIT
 		clean_make_disk_img "${tmp_mnt}"
 	fi
 
-	make_ramfs ${image_rootfs} ${initrd}
-	make_manifest ${image_rootfs} ${manifest}
+	make_ramfs "${rootfs_dir}" "${initrd}"
+	make_manifest "${rootfs_dir}" "${manifest}"
 
-	if [ -d ${tmp_mnt} ]; then
-		rm -rf ${tmp_mnt}
+	if [[ -d "${tmp_mnt}" ]]; then
+		rm -rf "${tmp_mnt}"
 	fi
 
-	need_clean_rootfs=${clean_rootfs}
+	need_clean_rootfs="${clean_rootfs}"
 
-	print_usage_summary ${image_rootfs} ${kernel_modules}
+	print_usage_summary "${rootfs_dir}" "${kernel_modules}"
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): done." >&2
-
 fi
 
-if [ ${need_clean_rootfs} ]; then
-	${sudo} rm -rf ${image_rootfs}
+if [[ ${need_clean_rootfs} ]]; then
+	${sudo} rm -rf "${rootfs_dir}"
 fi
 
-trap on_exit EXIT
+{
+	echo "${script_name}: INFO: Bootstrap directory = '${bootstrap_dir}'"
+	echo "${script_name}: INFO: Image files in '${image_dir}'"
+} >&2
 
-echo "${script_name}: INFO: Success: bootstrap='${bootstrap_dir}' image='${image_dir}'" >&2
+trap "on_exit 'Success'" EXIT
+exit 0
