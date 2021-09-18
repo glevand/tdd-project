@@ -208,9 +208,5 @@ get_default_packages() {
 		tcpdump
 	"
 
-	if [[ ${alpine_default_packages} ]]; then
-		echo ${alpine_default_packages}
-	else
-		echo ${default_packages}
-	fi
+	echo ${default_packages}
 }

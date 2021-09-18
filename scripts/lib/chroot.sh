@@ -4,20 +4,23 @@ get_qemu_static() {
 	local qemu_static
 
 	case "${host_arch}--${target_arch}" in
+	amd64--arm32)
+		qemu_static='/usr/bin/qemu-arm-static'
+		;;
 	amd64--arm64)
-		qemu_static="/usr/bin/qemu-aarch64-static"
+		qemu_static='/usr/bin/qemu-aarch64-static'
 		;;
 	amd64--ppc32)
-		qemu_static="/usr/bin/qemu-ppc-static"
+		qemu_static='/usr/bin/qemu-ppc-static'
 		;;
 	amd64--ppc64)
-		qemu_static="/usr/bin/qemu-ppc64-static"
+		qemu_static='/usr/bin/qemu-ppc64-static'
 		;;
 	arm64--amd64)
-		qemu_static="/usr/bin/qemu-x86_64-static"
+		qemu_static='/usr/bin/qemu-x86_64-static'
 		;;
 	*)
-		echo "${script_name}: ERROR: Unsupported host--target combo: '${"${host_arch}--${target_arch}"}'." >&2
+		echo "${script_name}: ERROR: Unsupported host--target combo: '${host_arch}--${target_arch}'." >&2
 		exit 1
 		;;
 	esac
@@ -36,7 +39,7 @@ clean_qemu_static() {
 
 	if [ "${host_arch}" != "${target_arch}" ]; then
 		qemu_static="$(get_qemu_static)"
-		${sudo} rm -f ${chroot}${qemu_static}
+		${sudo} rm -f "${chroot}${qemu_static}"
 	fi
 }
 
@@ -46,7 +49,7 @@ copy_qemu_static() {
 
 	if [ "${host_arch}" != "${target_arch}" ]; then
 		qemu_static="$(get_qemu_static)"
-		${sudo} cp -f ${qemu_static} ${chroot}${qemu_static}
+		${sudo} cp -f "${qemu_static}" "${chroot}${qemu_static}"
 	fi
 }
 
@@ -54,33 +57,33 @@ copy_qemu_static() {
 enter_chroot() {
 	local chroot=${1}
 	shift
-	local script=${@}
+	local script="${@}"
 
-	check_directory ${chroot}
-	copy_qemu_static ${chroot}
+	check_directory "${chroot}" '' ''
+	copy_qemu_static "${chroot}"
 
 	${sudo} mount -l -t proc
-	${sudo} umount  ${chroot}/proc || :
+	${sudo} umount  "${chroot}/proc" || :
 
-	mkdir -p  ${chroot}/proc ${chroot}/sys ${chroot}/dev ${chroot}/run
+	mkdir -p "${chroot}/proc" "${chroot}/sys" "${chroot}/dev" "${chroot}/run"
 
-	${sudo} mount -t proc -o nosuid,nodev,noexec /proc ${chroot}/proc
-	${sudo} mount --rbind /sys ${chroot}/sys
-	${sudo} mount --rbind /dev ${chroot}/dev
-	${sudo} mount --rbind /run ${chroot}/run
+	${sudo} mount -t proc -o nosuid,nodev,noexec /proc "${chroot}/proc"
+	${sudo} mount --rbind /sys "${chroot}/sys"
+	${sudo} mount --rbind /dev "${chroot}/dev"
+	${sudo} mount --rbind /run "${chroot}/run"
 
-	${sudo} LANG=C.UTF-8 PS4="+ chroot: " chroot ${chroot} /bin/sh -x <<EOF
+	${sudo} LANG=C.UTF-8 PS4="+ chroot: " chroot "${chroot}" /bin/sh -x <<EOF
 ${script}
 EOF
-	cleanup_chroot ${chroot}
+	cleanup_chroot "${chroot}"
 }
 
 cleanup_chroot () {
 	local chroot=${1}
 
-	clean_qemu_static ${chroot}
+	clean_qemu_static "${chroot}"
 
-	${sudo} umount --recursive ${chroot}/{proc,sys,dev,run} &> /dev/null || :
+	${sudo} umount --recursive "${chroot}"/{proc,sys,dev,run} &> /dev/null || :
 
-	mount | egrep ${chroot} || :
+	mount | egrep "${chroot}" || :
 }

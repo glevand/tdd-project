@@ -3,13 +3,17 @@
 debug_check() {
 	local info=${1}
 
-	echo "debug_check: (${info}) vvvv" >&2
-	set +e
-	${sudo} true
-	mount
-	${sudo} ls -l /var/run/sudo/ts
-	set -e
-	echo "debug_check: (${info}) ^^^^" >&2
+	if [[ ${verbose} ]]; then
+	{
+		echo "debug_check: vvvvv (${info}) vvvvvvvvvvvvvvvvvvvv"
+		set +e
+		${sudo} true
+		mount
+		${sudo} ls -l '/var/run/sudo/ts'
+		set -e
+		echo "debug_check: ^^^^^ (${info}) ^^^^^^^^^^^^^^^^^^^^"
+	} >&2
+	fi
 }
 
 bootstrap_rootfs() {
@@ -19,20 +23,29 @@ bootstrap_rootfs() {
 
 	case ${target_arch} in
 	amd64)
-		debian_arch="amd64"
-		debian_os_release=${debian_os_release:-"buster"}
-		debian_os_mirror=${debian_os_mirror:-"http://ftp.us.debian.org/debian"}
+		debian_arch='amd64'
+		debian_os_release="${debian_os_release:-bullseye}"
+		debian_os_mirror="${debian_os_mirror:-http://ftp.us.debian.org/debian}"
+		debootstrap_extra=''
+		;;
+	arm32)
+		debian_arch='armel'
+# 		debian_arch='armhf'
+		debian_os_release="${debian_os_release:-bullseye}"
+		debian_os_mirror="${debian_os_mirror:-http://ftp.us.debian.org/debian}"
+		debootstrap_extra=''
 		;;
 	arm64)
-		debian_arch="arm64"
-		debian_os_release=${debian_os_release:-"buster"}
-		debian_os_mirror=${debian_os_mirror:-"http://ftp.us.debian.org/debian"}
+		debian_arch='arm64'
+		debian_os_release="${debian_os_release:-bullseye}"
+		debian_os_mirror="${debian_os_mirror:-http://ftp.us.debian.org/debian}"
+		debootstrap_extra=''
 		;;
 	ppc32|ppc64)
-		debian_arch="powerpc"
-		debian_os_release=${debian_os_release:-"sid"}
-		debian_os_mirror=${debian_os_mirror:-"http://ftp.ports.debian.org/debian-ports"}
-		debootstrap_extra="--include=debian-ports-archive-keyring --exclude=powerpc-ibm-utils,powerpc-utils,vim-tiny"
+		debian_arch='powerpc'
+		debian_os_release="${debian_os_release:-sid}"
+		debian_os_mirror="${debian_os_mirror:-http://ftp.ports.debian.org/debian-ports}"
+		debootstrap_extra='--include=debian-ports-archive-keyring --exclude=powerpc-ibm-utils,powerpc-utils,vim-tiny'
 		;;
 	*)
 		echo "${script_name}: ERROR: Unsupported target-arch '${target_arch}'." >&2
@@ -40,11 +53,11 @@ bootstrap_rootfs() {
 		;;
 	esac
 
-	${sudo} chown root: ${rootfs}/
+	${sudo} chown root: "${rootfs}/"
 
-	(${sudo} debootstrap --foreign --arch ${debian_arch} --no-check-gpg \
+	(${sudo} debootstrap --foreign --arch "${debian_arch}" --no-check-gpg \
 		${debootstrap_extra} \
-		${debian_os_release} ${rootfs} ${debian_os_mirror})
+		"${debian_os_release}" "${rootfs}" "${debian_os_mirror}")
 
 	stat "${rootfs}/" "${rootfs}/dev" "${rootfs}/var" || :
 
@@ -53,32 +66,32 @@ bootstrap_rootfs() {
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
-	copy_qemu_static ${rootfs}
+	copy_qemu_static "${rootfs}"
 
 	${sudo} mount -l -t proc
-	${sudo} ls -la ${rootfs}
-	${sudo} find ${rootfs} -type l -exec ls -la {} \; | egrep ' -> /'
-	${sudo} rm -f ${rootfs}/proc
-	${sudo} mkdir -p  ${rootfs}/proc
-	${sudo} mount -t proc -o nosuid,nodev,noexec /proc ${rootfs}/proc
-	${sudo} mount -l -t proc
+	${sudo} ls -la "${rootfs}"
+	${sudo} find "${rootfs}" -type l -exec ls -la {} \; | egrep ' -> /'
+	${sudo} rm -f "${rootfs}/proc"
+	${sudo} mkdir -p "${rootfs}/proc"
+	${sudo} mount -t proc -o nosuid,nodev,noexec '/proc' "${rootfs}/proc"
+	${sudo} mount -l -t 'proc'
 
-	${sudo} LANG=C.UTF-8 chroot ${rootfs} /bin/sh -x <<EOF
+	${sudo} LANG=C.UTF-8 chroot "${rootfs}" /bin/sh -x <<EOF
 /debootstrap/debootstrap --second-stage
 EOF
 
-	${sudo} mount -l -t proc
-	${sudo} umount ${rootfs}/proc || :
-	${sudo} mount -l -t proc
+	${sudo} mount -l -t 'proc'
+	${sudo} umount "${rootfs}/proc" || :
+	${sudo} mount -l -t' proc'
 
-	clean_qemu_static ${rootfs}
+	clean_qemu_static "${rootfs}"
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
 	${sudo} sed --in-place 's/$/ contrib non-free/' \
-		${rootfs}/etc/apt/sources.list
+		"${rootfs}/etc/apt/sources.list"
 
-	enter_chroot ${rootfs} "
+	enter_chroot "${rootfs}" "
 		export DEBIAN_FRONTEND=noninteractive
 		apt-get update
 	"
@@ -124,14 +137,14 @@ setup_initrd_boot() {
 setup_network() {
 	local rootfs=${1}
 
-	setup_network_systemd ${rootfs}
+	setup_network_systemd "${rootfs}"
 }
 
 setup_login() {
 	local rootfs=${1}
 	local pw=${2}
 
-	setup_password ${rootfs} ${pw}
+	setup_password "${rootfs}" "${pw}"
 
 	${sudo} sed --in-place \
 		's|-/sbin/agetty -o|-/sbin/agetty --autologin root -o|' \
@@ -164,7 +177,7 @@ setup_sshd() {
 		exit 1
 	fi
 
-	${sudo} cp -f ${rootfs}/etc/ssh/ssh_host_rsa_key ${srv_key}
+	${sudo} cp -f "${rootfs}/etc/ssh/ssh_host_rsa_key" "${srv_key}"
 	echo "${script_name}: USER=@$(id --user --real --name)@" >&2
 	#printenv
 	#${sudo} chown $(id --user --real --name): ${srv_key}
@@ -222,17 +235,9 @@ get_default_packages() {
 		strace
 		tcpdump
 	"
-	local default_packages_arm64="
-		${default_packages}
-		efibootmgr
-		firmware-qlogic
-		firmware-bnx2x
-	"
 
-	if [[ ${debian_default_packages} ]]; then
-		echo ${debian_default_packages}
-	elif [[ ${target_arch} == "arm64" ]]; then
-		echo ${default_packages_arm64}
+	if [[ ${target_arch} == "arm64" ]]; then
+		echo "${default_packages} efibootmgr firmware-qlogic firmware-bnx2x"
 	else
 		echo ${default_packages}
 	fi
