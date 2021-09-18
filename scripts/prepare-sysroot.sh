@@ -97,7 +97,7 @@ if [[ ${usage} ]]; then
 fi
 
 check_opt 'sysroot' "${sysroot}"
-check_directory "${sysroot}" "" "usage"
+check_directory "${sysroot}" '' 'usage'
 
 # FIXME: Need to fixup /etc/ld.so.conf?
 

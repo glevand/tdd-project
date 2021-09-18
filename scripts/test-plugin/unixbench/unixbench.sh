@@ -61,7 +61,7 @@ test_build_unixbench() {
 	local archive_file="${tests_dir}/${test_name}.tar.gz"
 	local results_file="${tests_dir}/${test_name}-results.tar.gz"
 
-	check_directory "${sysroot}"
+	check_directory "${sysroot}" '' ''
 	rm -rf ${build_dir} ${archive_file}
 
 	git_checkout_safe ${src_dir} ${src_repo} ${repo_branch}

@@ -296,7 +296,7 @@ check_file "${ssh_login_key}"
 check_opt 'test-name' ${test_name}
 
 check_opt 'tests-dir' ${tests_dir}
-check_directory "${tests_dir}"
+check_directory "${tests_dir}" '' ''
 
 if [[ ${systemd_debug} ]]; then
 	start_qemu_extra_args+=" --systemd-debug"

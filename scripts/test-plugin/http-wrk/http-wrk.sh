@@ -47,7 +47,7 @@ test_build_http_wrk() {
 	local archive_file="${tests_dir}/${test_name}.tar.gz"
 	local results_file="${tests_dir}/${test_name}-results.tar.gz"
 
-	check_directory "${sysroot}"
+	check_directory "${sysroot}" '' ''
 
 	rm -rf ${build_dir} ${archive_file} ${results_file}
 

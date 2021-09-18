@@ -285,7 +285,7 @@ check_file "${ssh_login_key}" 'ssh-login-key' ''
 check_opt 'test-name' ${test_name}
 
 check_opt 'tests-dir' ${tests_dir}
-check_directory "${tests_dir}"
+check_directory "${tests_dir}" '' ''
 
 relay_triple=$(relay_init_triple ${relay_server})
 relay_token=$(relay_triple_to_token ${relay_triple})
