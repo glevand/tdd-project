@@ -200,7 +200,7 @@ script_name="${0##*/}"
 SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
 source "${SCRIPTS_TOP}/tdd-lib/util.sh"
 
-trap "on_exit 'failed.'" EXIT
+trap "on_exit 'Failed'" EXIT
 set -o pipefail
 set -e
 
@@ -237,19 +237,19 @@ fi
 SECONDS=0
 
 if [[ ${step_get} ]]; then
-	trap "on_exit '[get] failed.'" EXIT
+	trap "on_exit '[get] failed'" EXIT
 	get_rpms
 fi
 
 if [[ ${step_prepare} ]]; then
-	trap "on_exit '[prepare] failed.'" EXIT
+	trap "on_exit '[prepare] failed'" EXIT
 	prepare_sources
 fi
 
 if [[ ${step_build} ]]; then
-	trap "on_exit '[build] failed.'" EXIT
+	trap "on_exit '[build] failed'" EXIT
 	build_kernel
 fi
 
-trap "on_exit 'Success.'" EXIT
+trap "on_exit 'Success'" EXIT
 exit 0
