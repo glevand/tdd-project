@@ -1,9 +1,5 @@
 # wrk - HTTP benchmark test plug-in.
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
-
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-
 test_usage_http_wrk() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
@@ -95,3 +91,9 @@ test_run_http_wrk() {
 
 	echo "${FUNCNAME[0]}: Done, success." >&2
 }
+
+#===============================================================================
+SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}/../../../..")}"
+TEST_TOP="${TEST_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"

@@ -4,62 +4,52 @@ usage() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-	echo "${script_name} - Builds TDD container image, Linux kernel, root file system images, runs test suites." >&2
-	echo "Usage: ${script_name} [flags]" >&2
-	echo "Option flags:" >&2
-	echo "  --arch            - Target architecture {${known_arches}}. Default: ${target_arch}." >&2
-	echo "  -a --help-all     - Show test help and exit." >&2
-	echo "  -c --config-file  - ${script_name} config file. Default: '${config_file}'." >&2
-	echo "  -h --help         - Show this help and exit." >&2
-	echo "  -v --verbose      - Verbose execution." >&2
-	echo "  --build-name      - Build name. Default: '${build_name}'." >&2
-	echo "  --linux-config    - URL of an alternate kernel config file. Default: '${linux_config}'." >&2
-	echo "  --linux-source    - Linux kernel source tree path. Default: '${linux_source}'." >&2
-	echo "  --linux-repo      - Linux kernel git repository URL. Default: '${linux_repo}'." >&2
-	echo "  --linux-branch    - Linux kernel git repository branch. Default: '${linux_branch}'." >&2
-	echo "  --linux-src-dir   - Linux kernel git repository path. Default: '${linux_src_dir}'." >&2
-	echo "  --test-machine    - Test machine name {$(clean_ws ${TDD_TARGET_LIST}) qemu}. Default: '${test_machine}'." >&2
-	echo "  --systemd-debug   - Run systemd with debug options. Default: '${systemd_debug}'." >&2
-	echo "  --rootfs-types    - Rootfs types to build {$(clean_ws ${known_rootfs_types}) all}. Default: '${rootfs_types}'." >&2
-	echo "  --test-types      - Test types to run {$(clean_ws ${known_test_types}) all}. Default: '${test_types}'." >&2
-	echo "  --hostfwd-offset  - QEMU hostfwd port offset. Default: '${hostfwd_offset}'." >&2
-	echo "Option steps:" >&2
-	echo "  --enter               - Enter container, no builds." >&2
-	echo "  -1 --build-kernel     - Build kernel." >&2
-	echo "  -2 --build-bootstrap  - Build rootfs bootstrap." >&2
-	echo "  -3 --build-rootfs     - Build rootfs." >&2
-	echo "  -4 --build-tests      - Build tests." >&2
-	echo "  -5 --run-tests        - Run tests on test machine '${test_machine}'." >&2
-	echo "Environment:" >&2
-	echo "  TDD_PROJECT_ROOT    - Default: '${TDD_PROJECT_ROOT}'." >&2
-	echo "  TDD_TEST_ROOT       - Default: '${TDD_TEST_ROOT}'." >&2
-	echo "  TDD_CHECKOUT_SERVER - Default: '${TDD_CHECKOUT_SERVER}'." >&2
-	echo "  TDD_RELAY_SERVER    - Default: '${TDD_RELAY_SERVER}'." >&2
-	echo "  TDD_TFTP_SERVER     - Default: '${TDD_TFTP_SERVER}'." >&2
-	echo "  TDD_HISTFILE        - Default: '${TDD_HISTFILE}'." >&2
-	eval "${old_xtrace}"
-}
-
-test_usage() {
-	local old_xtrace
-	old_xtrace="$(shopt -po xtrace || :)"
-	set +o xtrace
-	echo "Test Plugin Info:" >&2
-	for test in ${known_test_types}; do
-		test_usage_${test/-/_}
-		echo "" >&2
-	done
+	{
+		echo "${script_name} - Builds TDD container image, Linux kernel, root file system images, runs test suites."
+		echo "Usage: ${script_name} [flags]"
+		echo "Option flags:"
+		echo "  -a --arch        - Target architecture {${known_arches}}. Default: ${target_arch}."
+		echo "  -c --config      - Configuration file. Default: '${config_file}'."
+		echo "  --build-name     - Build name. Default: '${build_name}'."
+		echo "  --linux-config   - URL of an alternate kernel config file. Default: '${linux_config}'."
+		echo "  --linux-source   - Linux kernel source tree path. Default: '${linux_source}'."
+		echo "  --linux-repo     - Linux kernel git repository URL. Default: '${linux_repo}'."
+		echo "  --linux-branch   - Linux kernel git repository branch. Default: '${linux_branch}'."
+		echo "  --linux-src-dir  - Linux kernel git repository path. Default: '${linux_src_dir}'."
+		echo "  --test-machine   - Test machine name {$(clean_ws ${TDD_TARGET_LIST}) qemu}. Default: '${test_machine}'."
+		echo "  --systemd-debug  - Run systemd with debug options. Default: '${systemd_debug}'."
+		echo "  --rootfs-types   - Rootfs types to build {$(clean_ws ${known_rootfs_types}) all}. Default: '${rootfs_types}'."
+		echo "  --test-types     - Test types to run {$(clean_ws ${known_test_types}) all}. Default: '${test_types}'."
+		echo "  --hostfwd-offset - QEMU hostfwd port offset. Default: '${hostfwd_offset}'."
+		echo "  -H --help-all    - Show help for all known tests and exit."
+		echo "  -h --help        - Show this help and exit."
+		echo "  -v --verbose     - Verbose execution. Default: '${verbose}'."
+		echo "  -g --debug       - Extra verbose execution. Default: '${debug}'."
+		echo "  -d --dry-run     - Dry run, don't run commands."
+		echo "Option steps:"
+		echo "  --enter              - Enter container, no builds."
+		echo "  -1 --build-kernel    - Build kernel."
+		echo "  -2 --build-bootstrap - Build rootfs bootstrap."
+		echo "  -3 --build-rootfs    - Build rootfs."
+		echo "  -4 --build-tests     - Build tests."
+		echo "  -5 --run-tests       - Run tests on test machine '${test_machine}'."
+		echo "Environment:"
+		echo "  TDD_PROJECT_ROOT    - Default: '${TDD_PROJECT_ROOT}'."
+		echo "  TDD_TEST_ROOT       - Default: '${TDD_TEST_ROOT}'."
+		echo "  TDD_CHECKOUT_SERVER - Default: '${TDD_CHECKOUT_SERVER}'."
+		echo "  TDD_RELAY_SERVER    - Default: '${TDD_RELAY_SERVER}'."
+		echo "  TDD_TFTP_SERVER     - Default: '${TDD_TFTP_SERVER}'."
+		echo "  TDD_HISTFILE        - Default: '${TDD_HISTFILE}'."
+	} >&2
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="ac:hv12345"
-	local long_opts="\
-arch:,help-all,config-file:,help,verbose,\
-build-name:,\
-linux-config:,linux-source:,linux-repo:,linux-branch:,linux-src-dir:,\
-test-machine:,systemd-debug,rootfs-types:,test-types:,hostfwd-offset:,\
-enter,build-kernel,build-bootstrap,build-rootfs,build-tests,run-tests"
+	local short_opts="ac:12345Hhvgd"
+	local long_opts="arch:,config:,build-name:,linux-config:,\
+linux-source:,linux-repo:,linux-branch:,linux-src-dir:,test-machine:,\
+systemd-debug,rootfs-types:,test-types:,hostfwd-offset:,enter,build-kernel,\
+build-bootstrap,build-rootfs,build-tests,run-tests,help-all,help,verbose,debug,dry-run"
 
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
@@ -69,26 +59,13 @@ enter,build-kernel,build-bootstrap,build-rootfs,build-tests,run-tests"
 	while true ; do
 		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
-		--arch)
+		-a | --arch)
 			target_arch=$(get_arch "${2}")
 			shift 2
 			;;
-		-a | --help-all)
-			help_all=1
-			shift
-			;;
-		-c | --config-file)
+		-c | --config)
 			config_file="${2}"
 			shift 2
-			;;
-		-h | --help)
-			usage=1
-			shift
-			;;
-		-v | --verbose)
-			set -x
-			verbose=1
-			shift
 			;;
 		--build-name)
 			build_name="${2}"
@@ -158,8 +135,32 @@ enter,build-kernel,build-bootstrap,build-rootfs,build-tests,run-tests"
 			step_run_tests=1
 			shift
 			;;
+		-H | --help-all)
+			help_all=1
+			shift
+			;;
+		-h | --help)
+			usage=1
+			shift
+			;;
+		-v | --verbose)
+			verbose=1
+			shift
+			;;
+		-g | --debug)
+			verbose=1
+			debug=1
+			keep_tmp_dir=1
+			set -x
+			shift
+			;;
+		-d | --dry-run)
+			dry_run=1
+			shift
+			;;
 		--)
 			shift
+			extra_args="${*}"
 			break
 			;;
 		*)
@@ -177,15 +178,48 @@ on_exit() {
 		${sudo} chown -R $(id --user --real --name): ${image_dir}
 	fi
 
-	local end_time
-	end_time="$(date)"
 	local sec="${SECONDS}"
+	local end_time
+	end_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
 	set +x
-	echo "${script_name}: start time: ${start_time}" >&2
-	echo "${script_name}: end time:   ${end_time}" >&2
-	echo "${script_name}: duration:   ${sec} sec ($(sec_to_min ${sec} min) min)" >&2
-	echo "${script_name}: Done:       ${result}" >&2
+	{
+		echo "${script_name}: start time: ${start_time}"
+		echo "${script_name}: end time:   ${end_time}"
+		echo "${script_name}: duration:   ${sec} sec ($(sec_to_min ${sec} min) min)"
+		echo "${script_name}: Done:       ${result}"
+	} >&2
+}
+
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+# 	{
+# 		if [[ ${debug:-} ]]; then
+# 			echo '------------------------'
+# 			set
+# 			echo '------------------------'
+# 		fi
+# 	} >&2
+
+	echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}" >&2
+	exit "${err_no}"
+}
+
+test_usage() {
+	local old_xtrace
+	old_xtrace="$(shopt -po xtrace || :)"
+	set +o xtrace
+	{
+		echo "Test Plugin Info:"
+		for test in ${known_test_types}; do
+			test_usage_${test/-/_}
+			echo ""
+		done
+	}  >&2
+	eval "${old_xtrace}"
 }
 
 check_machine() {
@@ -196,7 +230,7 @@ check_machine() {
 	fi
 
 	set +e
-	${SCRIPTS_TOP}/checkout-query.sh -v ${machine}
+	${SCRIPT_TOP}/checkout-query.sh -v ${machine}
 	result=${?}
 	set -e
 
@@ -284,7 +318,7 @@ build_kernel_from_src() {
 	local DEBUG="${DEBUG:-bash -x}"
 
 	# build defconfig
-	${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
+	${DEBUG} "${SCRIPT_TOP}/build-linux-kernel.sh" \
 		${verbose:+--verbose} \
 		--build-dir="${build_dir}" \
 		--install-dir="${install_dir}" \
@@ -295,14 +329,14 @@ build_kernel_from_src() {
 	if [[ "${config}" && "${config}" != "defconfig" ]]; then
 		if [[ -f "${config}" ]]; then
 			cp -vf "${config}" "${build_dir}/.config"
-			${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
+			${DEBUG} "${SCRIPT_TOP}/build-linux-kernel.sh" \
 				${verbose:+--verbose} \
 				--build-dir="${build_dir}" \
 				--install-dir="${install_dir}" \
 				${toolchain_prefix:+--toolchain-prefix="${toolchain_prefix}"} \
 				"${target_arch}" "${src_dir}" olddefconfig
 		else
-			${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
+			${DEBUG} "${SCRIPT_TOP}/build-linux-kernel.sh" \
 				${verbose:+--verbose} \
 				--build-dir="${build_dir}" \
 				--install-dir="${install_dir}" \
@@ -311,14 +345,14 @@ build_kernel_from_src() {
 		fi
 	fi
 
-	${DEBUG} "${SCRIPTS_TOP}/set-config-opts.sh" \
+	${DEBUG} "${SCRIPT_TOP}/set-config-opts.sh" \
 		--verbose \
 		${platform_args:+--platform-args="${platform_args}"} \
 		"${fixup_spec}" "${build_dir}/.config"
 
 
 	# build all
-	${DEBUG} "${SCRIPTS_TOP}/build-linux-kernel.sh" \
+	${DEBUG} "${SCRIPT_TOP}/build-linux-kernel.sh" \
 		${verbose:+--verbose} \
 		--build-dir="${build_dir}" \
 		--install-dir="${install_dir}" \
@@ -358,7 +392,7 @@ build_kernel_with_initrd() {
 
 	#export make_options_user="CONFIG_INITRAMFS_SOURCE=${image_dir}/initrd.cpio"
 
-	make_options_user="CONFIG_INITRAMFS_SOURCE=${image_dir}/initrd.cpio" ${SCRIPTS_TOP}/build-linux-kernel.sh \
+	make_options_user="CONFIG_INITRAMFS_SOURCE=${image_dir}/initrd.cpio" ${SCRIPT_TOP}/build-linux-kernel.sh \
 		--build-dir=${build_dir} \
 		--install-dir=${install_dir} \
 		${verbose:+--verbose} \
@@ -371,7 +405,7 @@ build_bootstrap() {
 
 	${sudo} rm -rf ${bootstrap_dir}
 
-	${SCRIPTS_TOP}/build-rootfs.sh \
+	${SCRIPT_TOP}/build-rootfs.sh \
 		--arch=${target_arch} \
 		--rootfs-type=${rootfs_type} \
 		--bootstrap-dir="${bootstrap_dir}" \
@@ -400,7 +434,7 @@ build_rootfs() {
 	local extra_packages
 	extra_packages+="$(test_packages_${test_name//-/_} ${rootfs_type} ${target_arch})"
 
-	${SCRIPTS_TOP}/build-rootfs.sh \
+	${SCRIPT_TOP}/build-rootfs.sh \
 		--arch=${target_arch} \
 		--rootfs-type=${rootfs_type} \
 		--bootstrap-dir="${bootstrap_dir}" \
@@ -425,7 +459,7 @@ create_sysroot() {
 	${sudo} rsync -a --delete ${rootfs}/ ${sysroot}/
 	${sudo} chown $(id --user --real --name): ${sysroot}
 
-	${SCRIPTS_TOP}/prepare-sysroot.sh \
+	${SCRIPT_TOP}/prepare-sysroot.sh \
 		${verbose:+--verbose} \
 		${sysroot}
 }
@@ -462,10 +496,10 @@ run_tests() {
 	local extra_args
 
 	if [[ ${test_machine} == 'qemu' ]]; then
-		test_script="${SCRIPTS_TOP}/run-kernel-qemu-tests.sh"
+		test_script="${SCRIPT_TOP}/run-kernel-qemu-tests.sh"
 		extra_args+=" --arch=${target_arch} ${hostfwd_offset:+--hostfwd-offset=${hostfwd_offset}}"
 	else
-		test_script="${SCRIPTS_TOP}/run-kernel-remote-tests.sh"
+		test_script="${SCRIPT_TOP}/run-kernel-remote-tests.sh"
 		extra_args+=" --test-machine=${test_machine}"
 	fi
 
@@ -486,67 +520,96 @@ run_tests() {
 }
 
 #===============================================================================
-# program start
-#===============================================================================
 export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
 
 script_name="${0##*/}"
 
-trap "on_exit '[setup] failed.'" EXIT
-set -e
+SECONDS=0
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
-DOCKER_TOP=${DOCKER_TOP:-"$(cd "${SCRIPTS_TOP}/../docker" && pwd)"}
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+trap 'on_err SIGUSR1 ? 3' SIGUSR1
 
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/rootfs-plugin/rootfs-plugin.sh"
-source "${SCRIPTS_TOP}/test-plugin/test-plugin.sh"
+set -eE
+set -o pipefail
+set -o nounset
+
+SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+DOCKER_TOP="${DOCKER_TOP:-$(realpath "${SCRIPT_TOP}/../docker")}"
+TDD_PROJECT_ROOT="${TDD_PROJECT_ROOT:-$(realpath "${SCRIPT_TOP}/..")}"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/rootfs-plugin/rootfs-plugin.sh"
+source "${SCRIPT_TOP}/test-plugin/test-plugin.sh"
+
+host_arch=$(get_arch "$(uname -m)")
+
+target_arch=${target_arch:-"${host_arch}"}
+#config_file_default="${HOME}/.tdd-run.conf"
+config_file_default="${SCRIPT_TOP}/tdd-run.conf"
+config_file="${config_file_default}"
+build_name="${script_name%.*}-$(date +%m-%d-%H)"
+linux_config='defconfig'
+linux_source=''
+linux_repo=''
+linux_branch=''
+linux_src_dir=''
+test_machine='qemu'
+systemd_debug=''
+rootfs_types='debian'
+test_types='sys-info'
+hostfwd_offset='20000'
+step_enter=''
+step_build_kernel=''
+step_build_bootstrap=''
+step_build_rootfs=''
+step_build_tests=''
+step_run_tests=''
+help_all=''
+usage=''
+verbose=''
+debug=''
+keep_tmp_dir=''
+dry_run=''
+extra_args=''
+
+image_dir=''
 
 for test in ${known_test_types}; do
-	if [[ -f ${SCRIPTS_TOP}/test-plugin/${test}/${test}.sh ]]; then
-		source "${SCRIPTS_TOP}/test-plugin/${test}/${test}.sh"
+	if [[ -f ${SCRIPT_TOP}/test-plugin/${test}/${test}.sh ]]; then
+		source "${SCRIPT_TOP}/test-plugin/${test}/${test}.sh"
 	else
 		echo "${script_name}: ERROR: Test plugin '${test}.sh' not found." >&2
 		exit 1
 	fi
 done
 
-set -x
+process_opts "${@}"
 
 sudo="sudo -S"
 parent_ops="$@"
 
-start_time="$(date)"
-SECONDS=0
+config_file="${config_file:-${SCRIPT_TOP}/tdd-run.conf}"
 
-process_opts "${@}"
+if [[ "${config_file}" != "${config_file_default}" ]]; then
+	check_file '--config file' "${config_file}"
+fi
 
-config_file="${config_file:-${SCRIPTS_TOP}/tdd-run.conf}"
-check_file ${config_file} " --config-file" "usage"
-source ${config_file}
+if [[ -f "${config_file}" ]]; then
+	source "${config_file}"
+fi
 
-container_work_dir=${container_work_dir:-"/tdd--test"}
+container_work_dir="${container_work_dir:-/tdd--test}"
+TDD_HISTFILE="${TDD_HISTFILE:-${container_work_dir}/${build_name}--bash_history}"
+TDD_TEST_ROOT="${TDD_TEST_ROOT:-$(realpath "$(pwd)")}"
 
-test_machine=${test_machine:-"qemu"}
-test_machine=${test_machine%-bmc}
+#test_machine=${test_machine%-bmc}
 
-build_name=${build_name:-"${script_name%.*}-$(date +%m.%d)"}
-target_arch=${target_arch:-"arm64"}
-host_arch=$(get_arch "$(uname -m)")
+top_build_dir="$(realpath "$(pwd)/${build_name}")"
 
-top_build_dir="$(pwd)/${build_name}"
-
-TDD_PROJECT_ROOT=${TDD_PROJECT_ROOT:-"$(cd ${SCRIPTS_TOP}/.. && pwd)"}
-TDD_TEST_ROOT=${TDD_TEST_ROOT:-"$(pwd)"}
-TDD_HISTFILE=${TDD_HISTFILE:-"${container_work_dir}/${build_name}--bash_history"}
-
-rootfs_types=${rootfs_types:-"debian"}
 rootfs_types="${rootfs_types//,/ }"
-
-test_types=${test_types:-"sys-info"}
 test_types="${test_types//,/ }"
-
-linux_config=${linux_config:-"defconfig"}
 
 if [[ ${linux_source} ]]; then
 	check_not_opt 'linux-source' 'linux-repo' ${linux_repo}
@@ -558,7 +621,7 @@ if [[ ${linux_source} ]]; then
 	linux_src_dir="${linux_source}"
 else
 	linux_repo=${linux_repo:-"https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git"}
-	linux_branch=${linux_branch:-"linux-5.3.y"}
+	linux_branch=${linux_branch:-"linux-5.14.y"}
 	linux_src_dir=${linux_src_dir:-"${top_build_dir}/$(git_get_repo_name ${linux_repo})"}
 fi
 
@@ -567,24 +630,26 @@ kernel_install_dir="${top_build_dir}/${target_arch}-kernel-install"
 
 case ${target_arch} in
 arm64)
-	fixup_spec="${SCRIPTS_TOP}/targets/arm64/tx2/tx2-fixup.spec"
+	fixup_spec="${SCRIPT_TOP}/targets/arm64/tx2/tx2-fixup.spec"
 	kernel_image="${kernel_install_dir}/boot/Image"
 	;;
 ppc*)
-	fixup_spec="${SCRIPTS_TOP}/targets/powerpc/powerpc-fixup.spec"
+	fixup_spec="${SCRIPT_TOP}/targets/powerpc/powerpc-fixup.spec"
 	kernel_image="${kernel_install_dir}/boot/vmlinux.strip"
 	;;
 *)
-	fixup_spec="${SCRIPTS_TOP}/targets/generic-fixup.spec"
+	fixup_spec="${SCRIPT_TOP}/targets/generic-fixup.spec"
 	kernel_image="${kernel_install_dir}/boot/vmlinux.strip"
 	;;
 esac
 
 if [[ ${help_all} ]]; then
 	set +o xtrace
-	usage
-	echo "" >&2
-	test_usage
+	{
+		usage
+		echo ""
+		test_usage
+	} >&2
 	trap - EXIT
 	exit 0
 fi
@@ -595,18 +660,24 @@ if [[ ${usage} ]]; then
 	exit 0
 fi
 
-if [[ ${TDD_BUILDER} ]]; then
+if [[ ${TDD_BUILDER:-} ]]; then
 	if [[ ${step_enter} ]]; then
 		echo "${script_name}: ERROR: Already in tdd-builder." >&2
 		exit 1
 	fi
 else
 	check_directory "${TDD_PROJECT_ROOT}" '' 'usage'
-
 	check_directory "${TDD_TEST_ROOT}" '' 'usage'
 
+	DOCKER_TAG="${DOCKER_TAG:-glevand/tdd-builder:latest}"
 
-	${DOCKER_TOP}/builder/build-builder.sh
+	if ! docker inspect --type image "${DOCKER_TAG}" &>/dev/null; then
+		echo "${script_name}: ERROR: Docker image '${DOCKER_TAG}' not found." >&2
+		exit 1
+		# "${DOCKER_TOP}/builder/build-builder.sh"
+	else
+		echo "${script_name}: Info: Using Docker image '${DOCKER_TAG}'." >&2
+	fi
 
 	echo "${script_name}: Entering ${build_name} container..." >&2
 
@@ -616,7 +687,52 @@ else
 		docker_cmd="/tdd/scripts/tdd-run.sh ${parent_ops}"
 	fi
 
-	${SCRIPTS_TOP}/run-builder.sh \
+# docker run \
+#   --rm \
+#   -it \
+#   -v /tmp/.X11-unix:/tmp/.X11-unix \
+#   -e DISPLAY \
+#   -e USER \
+#   -v /dev:/dev \
+#   --privileged \
+#   --network host \
+#   --name tdd-run-09-19-21 \
+#   --hostname tdd-run-09-19-21 \
+#   --add-host tdd-run-09-19-21:127.0.0.1 \
+#   -v /tmp/ssh-RSpQjf5VO2mi/agent.1761:/ssh-agent \
+#   -e SSH_AUTH_SOCK=/ssh-agent \
+#   --group-add 136 \
+#   --group-add sudo \
+#   -v /var/run/docker.sock:/var/run/docker.sock \
+#   -v /dev:/dev \
+#   -e TERM=xterm-256color \
+#   -e HISTFILE=/home/geoff/projects/SIE/builds/obmc-builds/cronos-smc-kernel-5.10-rebase/tdd-run-09-19-21--bash_history \
+#   -e P_HOST=smoke \
+#   -v /etc/timezone:/etc/timezone:ro \
+#   -v /etc/localtime:/etc/localtime:ro \
+#   -v /tmp/run-builder.sh.qfaQ/.bashrc:/home/geoff/.bashrc \
+#   --device /dev/kvm \
+#   --group-add 108 \
+#   -u 1000:1000 \
+#   -v /home/geoff/.ssh:/home/geoff/.ssh:ro \
+#   -v /etc/group:/etc/group:ro \
+#   -v /etc/passwd:/etc/passwd:ro \
+#   -v /etc/shadow:/etc/shadow:ro \
+#   -v /home/geoff/projects/SIE/builds/obmc-builds/cronos-smc-kernel-5.10-rebase:/home/geoff/projects/SIE/builds/obmc-builds/cronos-smc-kernel-5.10-rebase \
+#   -w /home/geoff/projects/SIE/builds/obmc-builds/cronos-smc-kernel-5.10-rebase \
+#   --dns 127.0.0.53 \
+#   -e build_name \
+#   -v /home/geoff/projects/tdd/git/tdd-project:/tdd-project:ro \
+#   -e TDD_PROJECT_ROOT=/tdd-project \
+#   -v /home/geoff/projects/tdd/tdd--test:/tdd--test:rw,z \
+#   -e TDD_TEST_ROOT=/tdd--test \
+#   -w /tdd--test \
+#   -e HISTFILE=/tdd--test/tdd-run-09-19-21--bash_history glevand/tdd-builder:latest \
+#   /bin/bash
+
+...do from here
+
+	"${DOCKER_TOP}/builder/run-builder.sh" \
 		--verbose \
 		--container-name="${build_name}" \
 		--docker-args="\
@@ -636,9 +752,12 @@ fi
 
 check_rootfs_types
 check_test_types
+
 if [[ ${step_run_tests} ]]; then
 	check_machine "${test_machine}"
 fi
+
+exit 22
 
 step_code="${step_build_kernel:-"0"}${step_build_bootstrap:-"0"}\
 ${step_build_rootfs:-"0"}${step_build_tests:-"0"}${step_run_tests:-"0"}\
