@@ -1,9 +1,5 @@
 #kselftest test plug-in
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
-
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-
 test_usage_kselftest() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
@@ -142,3 +138,9 @@ EOF
 	scp ${ssh_opts} ${ssh_host}:kselftest-results.tar.gz ${results_file}
 
 }
+
+#===============================================================================
+SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}/../../../..")}"
+TEST_TOP="${TEST_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"

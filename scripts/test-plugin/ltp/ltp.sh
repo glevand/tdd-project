@@ -1,10 +1,5 @@
 # LTP test plug-in.
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
-
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/chroot.sh"
-
 test_usage_ltp() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
@@ -205,3 +200,10 @@ EOF
 		echo "${FUNCNAME[0]}: Done, success." >&2
 	fi
 }
+
+#===============================================================================
+SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}/../../../..")}"
+TEST_TOP="${TEST_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/lib/chroot.sh"

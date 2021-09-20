@@ -180,7 +180,8 @@ test_run_ilp32() {
 
 }
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+#===============================================================================
+SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}/../../../..")}"
+TEST_TOP="${TEST_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
 
-TEST_TOP=${TEST_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+source "${SCRIPT_TOP}/tdd-lib/util.sh"

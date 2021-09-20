@@ -1,9 +1,5 @@
 # UnixBench test plug-in.
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}/.." && pwd)"}
-
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-
 test_usage_unixbench() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
@@ -139,3 +135,9 @@ EOF
 		echo "${FUNCNAME[0]}: Done, success." >&2
 	fi
 }
+
+#===============================================================================
+SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}/../../../..")}"
+TEST_TOP="${TEST_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
