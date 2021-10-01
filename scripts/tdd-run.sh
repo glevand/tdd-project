@@ -535,7 +535,9 @@ set -eE
 set -o pipefail
 set -o nounset
 
-SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
+
 DOCKER_TOP="${DOCKER_TOP:-$(realpath "${SCRIPT_TOP}/../docker")}"
 TDD_PROJECT_ROOT="${TDD_PROJECT_ROOT:-$(realpath "${SCRIPT_TOP}/..")}"
 

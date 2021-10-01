@@ -85,8 +85,10 @@ set -e
 script_name="${0##*/}"
 trap "on_exit 'failed.'" EXIT
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
 
 process_opts "${@}"
 
@@ -101,13 +103,13 @@ check_directory "${sysroot}" '' 'usage'
 
 # FIXME: Need to fixup /etc/ld.so.conf?
 
-${SCRIPTS_TOP}/relink.sh \
+${SCRIPT_TOP}/relink.sh \
 	--root-dir=${sysroot} \
 	${absolute:+--absolute} \
 	${dry_run:+--dry-run} \
 	${verbose:+--verbose} \
 	--start-dir=${sysroot}
-${SCRIPTS_TOP}/prepare-ld-scripts.sh \
+${SCRIPT_TOP}/prepare-ld-scripts.sh \
 	--root-dir=${sysroot} \
 	${absolute:+--absolute} \
 	${dry_run:+--dry-run} \

@@ -436,7 +436,9 @@ set -eE
 set -o pipefail
 set -o nounset
 
-SCRIPT_TOP="${SCRIPT_TOP:-$(realpath "${BASH_SOURCE%/*}")}"
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
+
 RELAY_TOP="${RELAY_TOP:-$(realpath "${SCRIPT_TOP}/../relay")}"
 
 source "${SCRIPT_TOP}/tdd-lib/util.sh"
