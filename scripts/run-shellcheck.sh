@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
-files=$(find ${SCRIPTS_TOP} -name '*.sh' -type f)
+files=$(find ${SCRIPT_TOP} -name '*.sh' -type f)
 
 set +e
 for f in ${files}; do

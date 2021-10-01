@@ -81,16 +81,18 @@ on_exit() {
 #===============================================================================
 
 script_name="${0##*/}"
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
+
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
 trap "on_exit 'failed.'" EXIT
 set -e
 
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
 
 process_opts "${@}"
 
-config_file="${config_file:-${SCRIPTS_TOP}/upload.conf}"
+config_file="${config_file:-${SCRIPT_TOP}/upload.conf}"
 
 check_file ${config_file} " --config-file" "usage"
 source ${config_file}

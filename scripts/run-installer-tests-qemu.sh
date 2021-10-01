@@ -207,7 +207,7 @@ start_qemu_with_kernel() {
 
 	echo "${script_name}: SSH fwd port = ${ssh_fwd}" >&2
 
-	${SCRIPTS_TOP}/start-qemu.sh \
+	${SCRIPT_TOP}/start-qemu.sh \
 		--verbose \
 		--arch="${target_arch}" \
 		--hostfwd-offset="${hostfwd_offset}" \
@@ -229,7 +229,7 @@ start_qemu_with_hda() {
 
 	echo "${script_name}: SSH fwd port = ${ssh_fwd}" >&2
 
-        ${SCRIPTS_TOP}/start-qemu.sh \
+        ${SCRIPT_TOP}/start-qemu.sh \
                 --verbose \
                 --arch="${target_arch}" \
                 --hostfwd-offset="${hostfwd_offset}" \
@@ -277,13 +277,15 @@ wait_for_qemu_start () {
 # program start
 #===============================================================================
 script_name="${0##*/}"
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
+
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
 trap "on_exit 'failed.'" EXIT
 set -e
 
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/relay.sh"
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/lib/relay.sh"
 
 host_arch=$(get_arch "$(uname -m)")
 

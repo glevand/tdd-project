@@ -221,8 +221,10 @@ set -ex
 script_name="${0##*/}"
 trap "on_exit 'Failed'" EXIT
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
 
 process_opts "${@}"
 

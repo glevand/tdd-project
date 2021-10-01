@@ -4,10 +4,11 @@ set -e
 
 script_name="${0##*/}"
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/relay.sh"
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/lib/relay.sh"
 
 usage() {
 	local old_xtrace
@@ -152,7 +153,7 @@ start_qemu_user_networking() {
 
 	echo "${script_name}: ssh_fwd port = ${ssh_fwd}" >&2
 
-	${SCRIPTS_TOP}/start-qemu.sh \
+	${SCRIPT_TOP}/start-qemu.sh \
 		--arch="${target_arch}" \
 		--kernel-cmd="${kernel_cmd}" \
 		--hostfwd-offset="${hostfwd_offset}" \
@@ -227,7 +228,7 @@ EOF
 
 	dhcpd -4 -pf /tmp/dhcpd.pid -cf /etc/dhcp/dhcpd.conf
 
-	${SCRIPTS_TOP}/start-qemu.sh \
+	${SCRIPT_TOP}/start-qemu.sh \
 		--ether-mac=${mac}
 		${start_qemu_extra_args} \
 		--arch=${target_arch} \
@@ -302,7 +303,7 @@ if [[ ${systemd_debug} ]]; then
 	start_qemu_extra_args+=" --systemd-debug"
 fi
 
-${SCRIPTS_TOP}/set-relay-triple.sh \
+${SCRIPT_TOP}/set-relay-triple.sh \
 	--kernel=${kernel} \
 	--relay-triple="${relay_triple}" \
 	--verbose
@@ -374,8 +375,8 @@ remote_ssh_opts=${user_remote_ssh_opts}
 # The remote host address could come from DHCP, so don't use known_hosts.
 ssh_no_check="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-if [[ -f ${SCRIPTS_TOP}/test-plugin/${test_name}/${test_name}.sh ]]; then
-	source "${SCRIPTS_TOP}/test-plugin/${test_name}/${test_name}.sh"
+if [[ -f ${SCRIPT_TOP}/test-plugin/${test_name}/${test_name}.sh ]]; then
+	source "${SCRIPT_TOP}/test-plugin/${test_name}/${test_name}.sh"
 else
 	echo "${script_name}: ERROR: Test plugin '${test_name}.sh' not found." >&2
 	exit 1

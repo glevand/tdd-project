@@ -4,10 +4,11 @@ set -e
 
 script_name="${0##*/}"
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/relay.sh"
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/lib/relay.sh"
 
 usage () {
 	local old_xtrace

@@ -177,7 +177,7 @@ on_exit() {
 	fi
 
 	if [[ ${checkout_token} ]]; then
-		${SCRIPTS_TOP}/checkin.sh ${checkout_token}
+		${SCRIPT_TOP}/checkin.sh ${checkout_token}
 	fi
 
 	set +x
@@ -210,7 +210,8 @@ script_name="${0##*/}"
 SECONDS=0
 start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
 initrd=''
 kernel=''
@@ -248,9 +249,9 @@ set -eE
 set -o pipefail
 set -o nounset
 
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
-source "${SCRIPTS_TOP}/lib/ipmi.sh"
-source "${SCRIPTS_TOP}/lib/relay.sh"
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+source "${SCRIPT_TOP}/lib/ipmi.sh"
+source "${SCRIPT_TOP}/lib/relay.sh"
 
 sudo="${sudo:-sudo -S}"
 ipmitool="${ipmitool:-ipmitool}"
@@ -298,13 +299,13 @@ if [[ ! ${systemd_debug} ]]; then
 else
 	tmp_kernel=${kernel}.tmp
 
-	${SCRIPTS_TOP}/set-systemd-debug.sh \
+	${SCRIPT_TOP}/set-systemd-debug.sh \
 		--in-file=${kernel} \
 		--out-file=${tmp_kernel} \
 		--verbose
 fi
 
-${SCRIPTS_TOP}/set-relay-triple.sh \
+${SCRIPT_TOP}/set-relay-triple.sh \
 	--relay-triple="${relay_triple}" \
 	--kernel=${tmp_kernel} \
 	--out-file=${test_kernel} \
@@ -320,7 +321,7 @@ if [[ "${test_machine}" == "qemu" ]]; then
 fi
 
 set +e
-checkout_token=$(${SCRIPTS_TOP}/checkout.sh -v ${test_machine} 1200) # 20 min.
+checkout_token=$(${SCRIPT_TOP}/checkout.sh -v ${test_machine} 1200) # 20 min.
 result=${?}
 set -e
 
@@ -334,7 +335,7 @@ if [[ ${no_known_hosts} ]]; then
 	tftp_upload_extra="--no-known-hosts"
 fi
 
-${SCRIPTS_TOP}/tftp-upload.sh --kernel=${test_kernel} --initrd=${initrd} \
+${SCRIPT_TOP}/tftp-upload.sh --kernel=${test_kernel} --initrd=${initrd} \
 	--ssh-login-key=${ssh_login_key} --tftp-triple=${tftp_triple} \
 	--tftp-dest="${test_machine}" ${tftp_upload_extra} --verbose
 
@@ -400,8 +401,8 @@ remote_ssh_opts=''
 # The remote host address could come from DHCP, so don't use known_hosts.
 ssh_no_check="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-if [[ -f ${SCRIPTS_TOP}/test-plugin/${test_name}/${test_name}.sh ]]; then
-	source "${SCRIPTS_TOP}/test-plugin/${test_name}/${test_name}.sh"
+if [[ -f ${SCRIPT_TOP}/test-plugin/${test_name}/${test_name}.sh ]]; then
+	source "${SCRIPT_TOP}/test-plugin/${test_name}/${test_name}.sh"
 else
 	echo "${script_name}: ERROR: Test plugin '${test_name}.sh' not found." >&2
 	exit 1

@@ -104,7 +104,8 @@ base_name="${base_name%.sh}"
 SECONDS=0
 start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
 tmp_dir=''
 
@@ -116,7 +117,7 @@ set -eE
 set -o pipefail
 set -o nounset
 
-source "${SCRIPTS_TOP}/../tdd-lib/util.sh"
+source "${SCRIPT_TOP}/../tdd-lib/util.sh"
 
 process_opts "${@}"
 

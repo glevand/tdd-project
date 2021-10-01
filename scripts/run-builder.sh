@@ -117,13 +117,15 @@ if [ ${TDD_BUILDER} ]; then
 	exit 1
 fi
 
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$( cd "${BASH_SOURCE%/*}" && pwd )"}
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
 
 trap "on_exit 'Done, failed.'" EXIT
 set -e
 
-DOCKER_TOP=${DOCKER_TOP:-"$( cd "${SCRIPTS_TOP}/../docker" && pwd )"}
+DOCKER_TOP=${DOCKER_TOP:-"$( cd "${SCRIPT_TOP}/../docker" && pwd )"}
 DOCKER_TAG=${DOCKER_TAG:-"$("${DOCKER_TOP}/builder/build-builder.sh" --tag)"}
 
 process_opts "${@}"

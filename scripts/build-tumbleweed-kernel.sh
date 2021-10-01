@@ -116,19 +116,19 @@ get_rpms() {
 	popd
 
 	mkdir -p "${out_dir}/${k_bin}"
-	(cd "${out_dir}/${k_bin}" && ${SCRIPTS_TOP}/rpm2files.sh < "${out_dir}/${k_bin}.rpm")
+	(cd "${out_dir}/${k_bin}" && ${SCRIPT_TOP}/rpm2files.sh < "${out_dir}/${k_bin}.rpm")
 
 	mkdir -p "${out_dir}/${k_src}"
-	(cd "${out_dir}/${k_src}" && ${SCRIPTS_TOP}/rpm2files.sh < "${out_dir}/${k_src}.rpm")
+	(cd "${out_dir}/${k_src}" && ${SCRIPT_TOP}/rpm2files.sh < "${out_dir}/${k_src}.rpm")
 
 	mkdir -p "${out_dir}/${k_dev}"
-	(cd "${out_dir}/${k_dev}" && ${SCRIPTS_TOP}/rpm2files.sh < "${out_dir}/${k_dev}.rpm")
+	(cd "${out_dir}/${k_dev}" && ${SCRIPT_TOP}/rpm2files.sh < "${out_dir}/${k_dev}.rpm")
 
 	#mkdir -p "${out_dir}/${k_bin_dev}"
-	#(cd "${out_dir}/${k_bin_dev}" && ${SCRIPTS_TOP}/rpm2files.sh < "${out_dir}/${k_bin_dev}.rpm")
+	#(cd "${out_dir}/${k_bin_dev}" && ${SCRIPT_TOP}/rpm2files.sh < "${out_dir}/${k_bin_dev}.rpm")
 
 	#mkdir -p "${out_dir}/${k_mac}"
-	#(cd "${out_dir}/${k_mac}" && ${SCRIPTS_TOP}/rpm2files.sh < "${out_dir}/${k_mac}.rpm")
+	#(cd "${out_dir}/${k_mac}" && ${SCRIPT_TOP}/rpm2files.sh < "${out_dir}/${k_mac}.rpm")
 
 	{
 		echo -e "${k_src_url}\n${k_dev_url}\n${k_mac_url}\n${k_bin_url}\n${k_def_url}\n"
@@ -171,7 +171,7 @@ build_kernel() {
 	
 	local log_file="${out_dir}/build.log"
 
-	${SCRIPTS_TOP}/build-linux-kernel.sh \
+	${SCRIPT_TOP}/build-linux-kernel.sh \
 		${verbose_build:+--verbose} \
 		--build-dir="${build_dir}" \
 		--install-dir="${install_dir}" \
@@ -179,13 +179,13 @@ build_kernel() {
 
 
 	cp -vf ${config_file} ${build_dir}/.config
-	${SCRIPTS_TOP}/build-linux-kernel.sh \
+	${SCRIPT_TOP}/build-linux-kernel.sh \
 		${verbose_build:+--verbose} \
 		--build-dir="${build_dir}" \
 		--install-dir="${install_dir}" \
 		arm64 "${src_dir}"  olddefconfig 2>&1 | tee --append "${log_file}"
 
-	${SCRIPTS_TOP}/build-linux-kernel.sh \
+	${SCRIPT_TOP}/build-linux-kernel.sh \
 		${verbose_build:+--verbose} \
 		--build-dir="${build_dir}" \
 		--install-dir="${install_dir}" \
@@ -197,8 +197,11 @@ export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[
 
 
 script_name="${0##*/}"
-SCRIPTS_TOP=${SCRIPTS_TOP:-"$(cd "${BASH_SOURCE%/*}" && pwd)"}
-source "${SCRIPTS_TOP}/tdd-lib/util.sh"
+
+real_source="$(realpath "${BASH_SOURCE}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
 
 trap "on_exit 'Failed'" EXIT
 set -o pipefail
