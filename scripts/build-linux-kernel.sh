@@ -131,11 +131,12 @@ on_exit() {
 		#${ccache} --show-config
 		${ccache} --show-stats
 
+		echo ''
+		echo '======================================================================'
+		echo 'stderr:'
+		echo '======================================================================'
+
 		if [[ -s "${stderr_out}" ]]; then
-			echo ''
-			echo '======================================================================'
-			echo 'stderr:'
-			echo '======================================================================'
 			echo ''
 			cat "${stderr_out}"
 		fi
@@ -155,18 +156,21 @@ on_exit() {
 	fi
 
 	set +x
-	echo "" >&2
-	echo -e "${script_name}: Done:          ${color}result = ${word} (${result})${ansi_reset}" >&2
-	echo "${script_name}: target:        '${target}'" >&2
-	echo "${script_name}: op:            '${op}'" >&2
-	echo "${script_name}: kernel_src:    '${kernel_src}'" >&2
-	echo "${script_name}: build_dir:     '${build_dir}'" >&2
-	echo "${script_name}: install_dir:   '${install_dir}'" >&2
-	echo "${script_name}: local_version: '${local_version}'" >&2
-	echo "${script_name}: make_options:  ${make_options}" >&2
-	echo "${script_name}: start_time:    ${start_time}" >&2
-	echo "${script_name}: end_time:      ${end_time}" >&2
-	echo "${script_name}: duration:      ${sec} sec ($(sec_to_min ${sec} min) min)" >&2
+	{
+		echo ""
+		echo -e "${script_name}: Done:          ${color}result = ${word} (${result})${ansi_reset}"
+		echo "${script_name}: op:            '${op}'"
+		echo "${script_name}: target:        '${target}'"
+		echo "${script_name}: kernel_src:    '${kernel_src}'"
+		echo "${script_name}: build_dir:     '${build_dir}'"
+		echo "${script_name}: stderr_out:    '${stderr_out}'"
+		echo "${script_name}: install_dir:   '${install_dir}'"
+		echo "${script_name}: local_version: '${local_version}'"
+		echo "${script_name}: make_options:  ${make_options}"
+		echo "${script_name}: start_time:    ${start_time}"
+		echo "${script_name}: end_time:      ${end_time}"
+		echo "${script_name}: duration:      ${sec} sec ($(sec_to_min ${sec} min) min)"
+	} >&2
 	exit ${result}
 }
 
@@ -175,10 +179,12 @@ on_err() {
 	local line_no=${2}
 	local err_no=${3}
 
-	if [[ ${debug} ]]; then
-		echo '------------------------' >&2
-		set >&2
-		echo '------------------------' >&2
+	if [[ ${on_err_debug} ]]; then
+		{
+			echo '------------------------'
+			set
+			echo '------------------------'
+		} >&2
 	fi
 	echo "${script_name}: ERROR: (${err_no}) at ${f_name}:${line_no}." >&2
 	exit "${err_no}"
@@ -401,7 +407,7 @@ ops="
 "
 
 trap "on_exit 'Failed'" EXIT
-trap 'on_err ${FUNCNAME[0]} ${LINENO} ${?}' ERR
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
 
 set -eE
 set -o pipefail
