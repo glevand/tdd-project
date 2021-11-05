@@ -330,13 +330,13 @@ case "${host_arch}--${target_arch}" in
 amd64--amd64)
 	have_efi=1
 	qemu_exe="qemu-system-x86_64"
-	qemu_args+=" -machine accel=kvm -cpu host -m 2048 -smp 2"
+	qemu_args+=" -machine accel=kvm -cpu host -m 8192 -smp 2"
 	qemu_args+=" -device i6300esb,id=watchdog0 -watchdog-action reset"
 	;;
 arm64--amd64)
 	have_efi=1
 	qemu_exe="qemu-system-x86_64"
-	qemu_args+=" -machine pc-q35-2.8 -cpu kvm64 -m 2048 -smp 2"
+	qemu_args+=" -machine pc-q35-2.8 -cpu kvm64 -m 8192 -smp 2"
 	;;
 amd64--arm64)
 	have_efi=1
@@ -354,9 +354,9 @@ arm64--arm64)
 amd64--ppc*)
 	unset have_efi
 	qemu_exe="qemu-system-ppc64"
-	#qemu_args+=" -machine cap-htm=off -m 2048"
-	#qemu_args+=" -machine pseries,cap-htm=off -m 2048"
-	qemu_args+=" -machine pseries,cap-htm=off -m 2048 -append 'root=/dev/ram0 console=hvc0'"
+	#qemu_args+=" -machine cap-htm=off -m 8192"
+	#qemu_args+=" -machine pseries,cap-htm=off -m 8192"
+	qemu_args+=" -machine pseries,cap-htm=off -m 8192 -append 'root=/dev/ram0 console=hvc0'"
 	;;
 *)
 	echo "${script_name}: ERROR: Unsupported host--target combo: '${host_arch}--${target_arch}'." >&2
@@ -476,7 +476,7 @@ fi
 
 if [[ ${have_efi} ]]; then
 	setup_efi
-	qemu_args+=" -drive if=pflash,file=${efi_code},format=raw,readonly"
+	qemu_args+=" -drive if=pflash,file=${efi_code},format=raw,readonly=on"
 	qemu_args+=" -drive if=pflash,file=${efi_vars},format=raw"
 fi
 
