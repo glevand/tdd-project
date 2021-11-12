@@ -431,6 +431,7 @@ extra_args=''
 
 make_options=''
 stderr_out=''
+on_err_debug=''
 
 process_opts "${@}"
 
