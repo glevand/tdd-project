@@ -115,8 +115,12 @@ toolchain-prefix:,vbuild,help,verbose,debug"
 on_exit() {
 	local result=${?}
 	local end_time
-	end_time="$(date)"
-	local sec="${SECONDS}"
+	local sec
+	local kernel_rev
+
+	end_time="$(date +%Y.%m.%d-%H.%M.%S)"
+	sec="${SECONDS}"
+	kernel_rev="$(git -C ${kernel_src} show --no-patch --pretty='format:%h')"
 
 	if [ -d "${tmp_dir:-}" ]; then
 		rm -rf "${tmp_dir:?}"
@@ -166,6 +170,7 @@ on_exit() {
 		echo "${script_name}: stderr_out:    '${stderr_out}'"
 		echo "${script_name}: install_dir:   '${install_dir}'"
 		echo "${script_name}: local_version: '${local_version}'"
+		echo "${script_name}: kernel_rev:    '${kernel_rev}'"
 		echo "${script_name}: make_options:  ${make_options}"
 		echo "${script_name}: start_time:    ${start_time}"
 		echo "${script_name}: end_time:      ${end_time}"
@@ -607,5 +612,8 @@ gconfig | menuconfig | oldconfig | olddefconfig | xconfig)
 *)
 	echo "${script_name}: INFO: Unknown op: '${op}'" >&2
 	run_cmd_tee "${make_cmd} ${make_options} ${op}"
+	if [[ "${op}" == *'_defconfig' ]]; then
+		eval "${make_cmd} ${make_options} savedefconfig"
+	fi
 	;;
 esac
