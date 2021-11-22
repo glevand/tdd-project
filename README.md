@@ -178,3 +178,10 @@ Seen: `chroot: failed to run command ‘/bin/bash’: Exec format error`
 
 Solution: Install
 [host binfmt support](https://github.com/glevand/tdd-project#host-system-binfmt-support).
+
+## Licence & Usage
+
+All files in the [TDD Project](https://github.com/glevand/tdd-project), unless
+otherwise noted, are covered by an
+[MIT Plus License](https://github.com/glevand/tdd-project/blob/master/mit-plus-license.txt).
+The text of the license describes what usage is allowed.
