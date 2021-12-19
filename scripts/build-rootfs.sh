@@ -162,7 +162,9 @@ on_fail() {
 
 	cleanup_chroot "${chroot}"
 
-	${sudo} chown -R $(id --user --real --name): "${chroot}"
+	local user_id
+	user_id="$(id --user --real --name)"
+	${sudo} find "${chroot}" -type f -o -type d -exec chown "${user_id}": '{}' ';'
 
 	if [[ -d "${mnt}" ]]; then
 		clean_make_disk_img "${mnt}"
@@ -284,12 +286,12 @@ setup_ssh_keys() {
 	ssh-keygen -q -f "${key_file}" -N ''
 	cat "${key_file}.pub" | sudo_append "${rootfs}/root/.ssh/authorized_keys"
 
-	for key in "${HOME}"/.ssh/id_*.pub; do
-		if [[ ! -f "${key_file}" ]]; then
+	local user_key
+	for user_key in "${HOME}"/.ssh/*.pub; do
+		if [[ ! -f "${user_key}" ]]; then
 			continue
 		fi
-		cat "${key_file}" | sudo_append "${rootfs}/root/.ssh/authorized_keys"
-		local found=1
+		cat "${user_key}" | sudo_append "${rootfs}/root/.ssh/authorized_keys"
 	done
 }
 
@@ -305,12 +307,13 @@ setup_kernel_modules() {
 	local dest
 	dest="${rootfs}/lib/modules/${src##*/}"
 
+	local extra=''
 	if [[ ${verbose} ]]; then
 		local extra='-v'
 	fi
 
 	${sudo} mkdir -p "${dest}"
-	${sudo} rsync -av --delete ${extra} \
+	${sudo} rsync -a --delete ${extra} \
 		--exclude '/build' --exclude '/source' \
 		"${src}/" "${dest}/"
 
@@ -335,8 +338,7 @@ setup_password() {
 
 	${sudo} sed --in-place "s/root:x:0:0/root:${hash}:0:0/" \
 		"${rootfs}/etc/passwd"
-	${sudo} sed --in-place '/^root:.*/d' \
-		"${rootfs}/etc/shadow"
+	${sudo} sed --in-place '/^root:.*/d' "${rootfs}/etc/shadow"
 }
 
 delete_rootfs() {
@@ -511,12 +513,14 @@ if [[ ${step_bootstrap} ]]; then
 
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
 
-	sudo rm -rf "${bootstrap_dir}"
+	${sudo} rm -rf "${bootstrap_dir}"
 	mkdir -p "${bootstrap_dir}"
 
 	trap "on_fail ${bootstrap_dir} none" EXIT
 	bootstrap_rootfs "${bootstrap_dir}"
-	${sudo} chown -R $(id --user --real --name): "${bootstrap_dir}"
+
+	user_id="$(id --user --real --name)"
+	${sudo} find "${bootstrap_dir}" -type f -o -type d -exec chown "${user_id}": '{}' ';'
 
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Done (${bootstrap_dir})." >&2
 	echo "${script_name}: INFO: Bootstrap size: $(directory_size_human ${bootstrap_dir})"
@@ -528,10 +532,10 @@ if [[ ${step_rootfs_setup} ]]; then
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
 	echo "${script_name}: INFO: Step ${current_step}: Using ${bootstrap_dir}." >&2
 
-	check_directory "${bootstrap_dir}" '' ''
-	check_directory "${bootstrap_dir}/usr/bin" '' ''
+	check_directory "${bootstrap_dir}" 'bootstrap dir' ''
+	check_directory "${bootstrap_dir}/usr/bin" 'bootstrap/usr/bin' ''
 
-	check_directory "${kernel_modules}" '' ''
+	check_directory "${kernel_modules}" 'kernel modules' ''
 	check_kernel_modules "${kernel_modules}"
 
 	trap "on_fail ${rootfs_dir} none" EXIT
@@ -551,7 +555,8 @@ if [[ ${step_rootfs_setup} ]]; then
 
 	rootfs_cleanup "${rootfs_dir}"
 
-	${sudo} chown -R $(id --user --real --name): "${rootfs_dir}"
+	user_id="$(id --user --real --name)"
+	${sudo} find "${rootfs_dir}" -type f -o -type d -exec chown "${user_id}": '{}' ';'
 
 	print_usage_summary "${rootfs_dir}" "${kernel_modules}"
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): done." >&2
@@ -559,10 +564,11 @@ fi
 
 if [[ ${step_make_image} ]]; then
 	current_step='make_image'
-
 	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
 
-	check_directory "${rootfs_dir}" '' ''
+	check_directory "${rootfs_dir}" 'rootfs_dir' ''
+
+	tmp_mnt=''
 
 	if [[ ${output_disk_image} ]]; then
 		tmp_mnt="${tmp_dir}/tdd-disk-mnt"

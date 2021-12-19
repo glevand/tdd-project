@@ -53,6 +53,40 @@ copy_qemu_static() {
 	fi
 }
 
+setup_chroot_mounts() {
+	local chroot=${1}
+
+	${sudo} mount --bind '/dev' "${chroot}/dev"
+	${sudo} mount --bind '/proc' "${chroot}/proc"
+	${sudo} mount --bind '/sys' "${chroot}/sys"
+# 	${sudo} mount --bind '/run' "${chroot}/run"  FIXME: Need it???
+
+	${sudo} mv "${chroot}/etc/resolv.conf" "${chroot}/etc/resolv.conf.o1"
+	${sudo} cp '/etc/resolv.conf' "${chroot}/etc/resolv.conf"
+
+	if [[ ${verbose} ]]; then
+		mount | egrep "${chroot}" || :
+	fi
+}
+
+clean_chroot_mounts() {
+	local chroot=${1}
+
+	if [[ ${verbose} ]]; then
+		mount | egrep "${chroot}" || :
+	fi
+
+	if [[ -f "${chroot}/etc/resolv.conf.o1" ]]; then
+		${sudo} cp -a "${chroot}/etc/resolv.conf.o1" "${chroot}/etc/resolv.conf"
+	fi
+
+	{
+# 		${sudo} umount "${chroot}/run" || :
+		${sudo} umount "${chroot}/sys" || :
+		${sudo} umount "${chroot}/proc" || :
+		${sudo} umount "${chroot}/dev" || :
+	} 2>/dev/null
+}
 
 enter_chroot() {
 	local chroot=${1}
@@ -67,23 +101,19 @@ enter_chroot() {
 
 	mkdir -p "${chroot}/proc" "${chroot}/sys" "${chroot}/dev" "${chroot}/run"
 
-	${sudo} mount -t proc -o nosuid,nodev,noexec /proc "${chroot}/proc"
-	${sudo} mount --rbind /sys "${chroot}/sys"
-	${sudo} mount --rbind /dev "${chroot}/dev"
-	${sudo} mount --rbind /run "${chroot}/run"
+	setup_chroot_mounts "${chroot}"
 
 	${sudo} LANG=C.UTF-8 PS4="+ chroot: " chroot "${chroot}" /bin/sh -x <<EOF
 ${script}
 EOF
-	cleanup_chroot "${chroot}"
+	clean_chroot_mounts "${chroot}"
 }
 
 cleanup_chroot () {
 	local chroot=${1}
 
 	clean_qemu_static "${chroot}"
-
-	${sudo} umount --recursive "${chroot}"/{proc,sys,dev,run} &> /dev/null || :
+	clean_chroot_mounts "${chroot}"
 
 	mount | egrep "${chroot}" || :
 }

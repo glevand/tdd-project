@@ -71,20 +71,15 @@ bootstrap_rootfs() {
 	${sudo} mount -l -t proc
 	${sudo} ls -la "${rootfs}"
 	${sudo} find "${rootfs}" -type l -exec ls -la {} \; | egrep ' -> /'
-	${sudo} rm -f "${rootfs}/proc"
-	${sudo} mkdir -p "${rootfs}/proc"
-	${sudo} mount -t proc -o nosuid,nodev,noexec '/proc' "${rootfs}/proc"
-	${sudo} mount -l -t 'proc'
+
+	setup_chroot_mounts "${rootfs}"
 
 	${sudo} LANG=C.UTF-8 chroot "${rootfs}" /bin/sh -x <<EOF
 /debootstrap/debootstrap --second-stage
 EOF
 
-	${sudo} mount -l -t 'proc'
-	${sudo} umount "${rootfs}/proc" || :
-	${sudo} mount -l -t' proc'
-
 	clean_qemu_static "${rootfs}"
+	clean_chroot_mounts "${rootfs}"
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
@@ -134,12 +129,6 @@ setup_initrd_boot() {
 	${sudo} cp -a "${rootfs}/etc/os-release" "${rootfs}/etc/initrd-release"
 }
 
-setup_network() {
-	local rootfs=${1}
-
-	setup_network_systemd "${rootfs}"
-}
-
 setup_login() {
 	local rootfs=${1}
 	local pw=${2}
@@ -153,6 +142,12 @@ setup_login() {
 	${sudo} sed --in-place \
 		's|-/sbin/agetty -o|-/sbin/agetty --autologin root -o|' \
 		${rootfs}/lib/systemd/system/getty@.service
+}
+
+setup_network() {
+	local rootfs=${1}
+
+	setup_network_systemd "${rootfs}"
 }
 
 setup_sshd() {
