@@ -1,4 +1,9 @@
 # Debian plug-in routines for build-rootfs.sh.
+#
+# @PACKAGE_NAME@ ${script_name}"
+# Version: @PACKAGE_VERSION@"
+# Home: @PACKAGE_URL@"
+#
 
 debug_check() {
 	local info=${1}

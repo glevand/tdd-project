@@ -1,4 +1,9 @@
 # CoreOS plug-in routines for build-rootfs.sh.
+#
+# @PACKAGE_NAME@ ${script_name}"
+# Version: @PACKAGE_VERSION@"
+# Home: @PACKAGE_URL@"
+#
 
 bootstrap_rootfs() {
 	local rootfs=${1}

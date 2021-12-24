@@ -97,10 +97,10 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image,help,verbose,d
 			shift
 			;;
 		-g | --debug)
+			set -x
 			verbose=1
 			debug=1
 			keep_tmp_dir=1
-			set -x
 			shift
 			;;
 		-d | --dry-run)
@@ -168,15 +168,11 @@ on_fail() {
 
 	if [[ -d "${mnt}" ]]; then
 		clean_make_disk_img "${mnt}"
-		rm -rf "${mnt}"
-	fi
-
-	if [[ -d "${tmp_dir}" ]]; then
-		${sudo} rm -rf "${tmp_dir:?}"
+		delete_dir "${mnt:?}"
 	fi
 
 	if [[ ${need_clean_rootfs} ]]; then
-		${sudo} rm -rf "${chroot}"
+		delete_dir_sudo "${chroot:?}"
 	fi
 
 	on_exit 'Failed'
@@ -317,7 +313,7 @@ setup_kernel_modules() {
 		--exclude '/build' --exclude '/source' \
 		"${src}/" "${dest}/"
 
-	echo "${script_name}: INFO: Kernel modules size: $(directory_size_human ${dest})"
+	echo "${script_name}: INFO: Kernel modules size: $(file_size_human ${dest})"
 }
 
 setup_password() {
@@ -341,10 +337,20 @@ setup_password() {
 	${sudo} sed --in-place '/^root:.*/d' "${rootfs}/etc/shadow"
 }
 
-delete_rootfs() {
-	local rootfs=${1}
+delete_dir_sudo() {
+	local dir=${1}
 
-	rm -rf "${rootfs:?}"
+	if [[ -d "${dir}" ]]; then
+		${sudo} rm -rf "${dir:?}"
+	fi
+}
+
+delete_dir() {
+	local dir=${1}
+
+	if [[ -d "${dir}" ]]; then
+		rm -rf "${dir:?}"
+	fi
 }
 
 clean_make_disk_img() {
@@ -391,25 +397,28 @@ print_usage_summary() {
 	local rootfs_dir=${1}
 	local kernel_modules=${2}
 
-	rootfs_size="$(directory_size_bytes "${rootfs_dir}")"
-	rootfs_size="$(bc <<< "${rootfs_size} / 1048576")"
+	local rootfs_size
 
-	modules_size="$(directory_size_bytes "${kernel_modules}")"
-	modules_size="$(bc <<< "${modules_size} / 1048576")"
+	rootfs_size="$(file_size_human "${rootfs_dir}")"
 
-	base_size="$(bc <<< "${rootfs_size} - ${modules_size}")"
+	echo "${script_name}: INFO: Rootfs size:  ${rootfs_size} MiB"
 
-	local old_xtrace
-	old_xtrace="$(shopt -po xtrace || :)"
-	set +o xtrace
+	if [[ -d "${kernel_modules}" ]]; then
+		local modules_size
+		local base_size
 
-	{
+		modules_size="$(file_size_human "${kernel_modules}")"
+		base_size="$(bc <<< "${rootfs_size} - ${modules_size}")"
 		echo "${script_name}: INFO: Base size:    ${base_size} MiB"
 		echo "${script_name}: INFO: Modules size: ${modules_size} MiB"
-		echo "${script_name}: INFO: Total size:   ${rootfs_size} MiB"
-	} >&1
+	fi
 
-	eval "${old_xtrace}"
+	if [[ -f "${initrd}" ]]; then
+		local initrd_size
+
+		initrd_size="$(file_size_human "${initrd}")"
+		echo "${script_name}: INFO: initrd size:  ${initrd_size} MiB"
+	fi
 }
 
 write_tdd_client_script() {
@@ -511,9 +520,11 @@ need_clean_rootfs=''
 if [[ ${step_bootstrap} ]]; then
 	current_step="bootstrap"
 
-	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
+	{
+		echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Start."
+	} >&2
 
-	${sudo} rm -rf "${bootstrap_dir}"
+	delete_dir "${bootstrap_dir:?}"
 	mkdir -p "${bootstrap_dir}"
 
 	trap "on_fail ${bootstrap_dir} none" EXIT
@@ -522,20 +533,26 @@ if [[ ${step_bootstrap} ]]; then
 	user_id="$(id --user --real --name)"
 	${sudo} find "${bootstrap_dir}" -type f -o -type d -exec chown "${user_id}": '{}' ';'
 
-	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Done (${bootstrap_dir})." >&2
-	echo "${script_name}: INFO: Bootstrap size: $(directory_size_human ${bootstrap_dir})"
+	{
+		echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Done."
+		echo "${script_name}: INFO: Bootstrap files in '${bootstrap_dir}'."
+		echo "${script_name}: INFO: Bootstrap size: $(file_size_human ${bootstrap_dir})"
+	} >&2
 fi
 
 if [[ ${step_rootfs_setup} ]]; then
 	current_step='rootfs_setup'
 
-	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
-	echo "${script_name}: INFO: Step ${current_step}: Using ${bootstrap_dir}." >&2
+	{
+		echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Start."
+		echo "${script_name}: INFO: Step ${current_step}: Using bootstrap '${bootstrap_dir}'."
+		echo "${script_name}: INFO: Step ${current_step}: Using modules '${kernel_modules}'."
+	} >&2
 
-	check_directory "${bootstrap_dir}" 'bootstrap dir' ''
-	check_directory "${bootstrap_dir}/usr/bin" 'bootstrap/usr/bin' ''
+	check_directory "${bootstrap_dir}" ' bootstrap dir' ''
+	check_directory "${bootstrap_dir}/usr/bin" ' bootstrap/usr/bin' ''
 
-	check_directory "${kernel_modules}" 'kernel modules' ''
+	check_directory "${kernel_modules}" ' kernel modules' ''
 	check_kernel_modules "${kernel_modules}"
 
 	trap "on_fail ${rootfs_dir} none" EXIT
@@ -559,14 +576,23 @@ if [[ ${step_rootfs_setup} ]]; then
 	${sudo} find "${rootfs_dir}" -type f -o -type d -exec chown "${user_id}": '{}' ';'
 
 	print_usage_summary "${rootfs_dir}" "${kernel_modules}"
-	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): done." >&2
+
+	{
+		echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Done."
+		echo "${script_name}: INFO: Bootstrap files in '${bootstrap_dir}'."
+		echo "${script_name}: INFO: Rootfs files in '${rootfs_dir}'."
+	} >&2
 fi
 
 if [[ ${step_make_image} ]]; then
 	current_step='make_image'
-	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): start." >&2
 
-	check_directory "${rootfs_dir}" 'rootfs_dir' ''
+	{
+		echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Start."
+		echo "${script_name}: INFO: Step ${current_step}: Using rootfs '${rootfs_dir}'."
+	} >&2
+
+	check_directory "${rootfs_dir}" ' rootfs_dir' ''
 
 	tmp_mnt=''
 
@@ -581,24 +607,21 @@ if [[ ${step_make_image} ]]; then
 	make_ramfs "${rootfs_dir}" "${initrd}"
 	make_manifest "${rootfs_dir}" "${manifest}"
 
-	if [[ -d "${tmp_mnt}" ]]; then
-		rm -rf "${tmp_mnt}"
-	fi
-
 	need_clean_rootfs="${clean_rootfs}"
 
 	print_usage_summary "${rootfs_dir}" "${kernel_modules}"
-	echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): done." >&2
+
+	{
+		echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Done."
+		echo "${script_name}: INFO: Image files in '${image_dir}'"
+	} >&2
+
 fi
 
 if [[ ${need_clean_rootfs} ]]; then
-	${sudo} rm -rf "${rootfs_dir}"
+	delete_rootfs "${rootfs_dir:?}"
 fi
 
-{
-	echo "${script_name}: INFO: Bootstrap directory = '${bootstrap_dir}'"
-	echo "${script_name}: INFO: Image files in '${image_dir}'"
-} >&2
 
 trap "on_exit 'Success'" EXIT
 exit 0
