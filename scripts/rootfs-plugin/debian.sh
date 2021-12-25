@@ -92,22 +92,10 @@ EOF
 		"${rootfs}/etc/apt/sources.list"
 
 	enter_chroot "${rootfs}" "
-		export DEBIAN_FRONTEND=noninteractive
-		apt-get update
+		DEBIAN_FRONTEND=noninteractive apt-get update
+		DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
 	"
 
-	debug_check "${FUNCNAME[0]}:${LINENO}"
-}
-
-rootfs_cleanup() {
-	local rootfs=${1}
-
-	debug_check "${FUNCNAME[0]}:${LINENO}"
-	enter_chroot ${rootfs} "
-		export DEBIAN_FRONTEND=noninteractive
-		apt-get -y autoremove
-		rm -rf /var/lib/apt/lists/*
-	"
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 }
 
@@ -119,10 +107,18 @@ setup_packages() {
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
 	enter_chroot ${rootfs} "
-		export DEBIAN_FRONTEND=noninteractive
-		apt-get update
-		apt-get -y upgrade
-		apt-get -y install ${packages}
+		DEBIAN_FRONTEND=noninteractive apt-get -y install ${packages}
+	"
+	debug_check "${FUNCNAME[0]}:${LINENO}"
+}
+
+rootfs_cleanup() {
+	local rootfs=${1}
+
+	debug_check "${FUNCNAME[0]}:${LINENO}"
+	enter_chroot ${rootfs} "
+		DEBIAN_FRONTEND=noninteractive apt-get -y clean
+		rm -rf /var/lib/apt/lists/*
 	"
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 }

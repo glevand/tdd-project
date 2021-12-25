@@ -10,6 +10,7 @@ usage() {
 		echo "Option flags:"
 		echo "  -a --arch           - Target architecture {$(clean_ws ${known_arches})}. Default: '${target_arch}'."
 		echo "  -t --rootfs-type    - Rootfs type {$(clean_ws ${known_rootfs_types})}. Default: '${rootfs_type}'."
+		echo "  -m --minimal        - Install no extra packages. Default: '${minimal_install}'."
 		echo "  -c --clean-rootfs   - Remove bootstrap and rootfs directories. Default: '${clean_rootfs}'"
 		echo "  -i --disk-image     - Generate a binary disk image file: '${output_disk_image}'."
 		echo "  --bootstrap-dir     - Bootstrap directory. Default: '${bootstrap_dir}'."
@@ -32,9 +33,10 @@ usage() {
 }
 
 process_opts() {
-	local short_opts="a:t:ci123hvgd"
-	local long_opts="arch:,rootfs-type:,clean-rootfs,disk-image,bootstrap-dir:,output-dir:,\
-bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image,help,verbose,debug,dry-run"
+	local short_opts="a:t:mcikp:123hvgd"
+	local long_opts="arch:,rootfs-type:,minimal,clean-rootfs,disk-image,\
+kernel-modules:,extra-packages:bootstrap-dir:,output-dir:,\
+bootstrap,rootfs-setup,make-image,help,verbose,debug,dry-run"
 
 	local opts
 	opts=$(getopt --options "${short_opts}" --long "${long_opts}" -n "${script_name}" -- "${@}")
@@ -52,6 +54,10 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image,help,verbose,d
 			rootfs_type="${2}"
 			shift 2
 			;;
+		-m | --minimal)
+			minimal_install=1
+			shift
+			;;
 		-c | --clean-rootfs)
 			clean_rootfs=1
 			shift
@@ -60,7 +66,7 @@ bootstrap,rootfs-setup,kernel-modules:,extra-packages:,make-image,help,verbose,d
 			output_disk_image=1
 			shift
 			;;
-		-m | --kernel-modules)
+		-k | --kernel-modules)
 			kernel_modules="${2}"
 			shift 2
 			;;
@@ -459,22 +465,23 @@ sudo='sudo -S'
 host_arch="$(get_arch "$(uname -m)")"
 
 target_arch="${host_arch}"
+rootfs_type='debian'
+minimal_install=''
 clean_rootfs=''
 output_disk_image=''
-kernel_modules=''
-extra_packages=''
-rootfs_type='debian'
 bootstrap_dir=''
 output_dir="$(realpath "$(pwd)/${target_arch}-${rootfs_type}-rootfs")"
-rootfs_dir=''
 usage=''
 verbose=''
 debug=''
 dry_run=''
-keep_tmp_dir=''
 step_bootstrap=''
 step_rootfs_setup=''
+kernel_modules=''
+extra_packages=''
 step_make_image=''
+
+keep_tmp_dir=''
 
 process_opts "${@}"
 
@@ -560,15 +567,17 @@ if [[ ${step_rootfs_setup} ]]; then
 	mkdir -p "${rootfs_dir}"
 	${sudo} rsync -a --delete "${bootstrap_dir}/" "${rootfs_dir}/"
 
-	setup_packages "${rootfs_dir}" "$(get_default_packages) ${extra_packages}"
-
 	setup_initrd_boot "${rootfs_dir}"
 	setup_login "${rootfs_dir}" ''
 	setup_network "${rootfs_dir}"
-	setup_sshd "${rootfs_dir}" "${server_key}"
-	setup_ssh_keys "${rootfs_dir}" "${login_key}"
-	setup_kernel_modules "${rootfs_dir}" "${kernel_modules}"
-	setup_relay_client "${rootfs_dir}"
+
+	if [[ ! ${minimal_install} ]]; then
+		setup_packages "${rootfs_dir}" "$(get_default_packages) ${extra_packages}"
+		setup_sshd "${rootfs_dir}" "${server_key}"
+		setup_ssh_keys "${rootfs_dir}" "${login_key}"
+		setup_kernel_modules "${rootfs_dir}" "${kernel_modules}"
+		setup_relay_client "${rootfs_dir}"
+	fi
 
 	rootfs_cleanup "${rootfs_dir}"
 
