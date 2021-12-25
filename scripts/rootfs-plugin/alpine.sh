@@ -80,25 +80,9 @@ bootstrap_rootfs() {
 		set -e
 		apk update
 		apk upgrade
-		apk add openrc \
-			busybox-initscripts \
-			dropbear \
-			dropbear-scp \
-			haveged \
-			net-tools \
-			strace
 		cat /etc/os-release
 		apk info | sort
 	"
-
-	${sudo} ln -s "/etc/init.d/"{hwclock,modules,sysctl,hostname,bootmisc,syslog} \
-		"${bootstrap_dir}/etc/runlevels/boot/"
-	${sudo} ln -s "/etc/init.d"/{devfs,dmesg,mdev,hwdrivers} \
-		"${bootstrap_dir}/etc/runlevels/sysinit/"
-	${sudo} ln -s "/etc/init.d/"{networking} \
-		"${bootstrap_dir}/etc/runlevels/default/"
-	${sudo} ln -s "/etc/init.d/"{mount-ro,killprocs,savecache} \
-		"${bootstrap_dir}/etc/runlevels/shutdown/"
 
 	local alpine_conf
 
@@ -130,22 +114,34 @@ rootfs_cleanup() {
 }
 
 setup_packages() {
-	local rootfs=${1}
+	local rootfs_dir=${1}
 	shift 1
 	local packages="${@//,/ }"
 
-	enter_chroot "${rootfs}" "
+	enter_chroot "${rootfs_dir}" "
 		set -e
 		apk add "${packages}"
 		apk info | sort
 	"
 
+	${sudo} ln -s "/etc/init.d/"{hwclock,modules,sysctl,hostname,bootmisc,syslog} \
+		"${rootfs_dir}/etc/runlevels/boot/"
+
+	${sudo} ln -s "/etc/init.d"/{devfs,dmesg,mdev,hwdrivers} \
+		"${rootfs_dir}/etc/runlevels/sysinit/"
+
+	${sudo} ln -s "/etc/init.d/"{networking} \
+		"${rootfs_dir}/etc/runlevels/default/"
+
+	${sudo} ln -s "/etc/init.d/"{mount-ro,killprocs,savecache} \
+		"${rootfs_dir}/etc/runlevels/shutdown/"
+
 	${sudo} ln -s /etc/init.d/{haveged,dropbear} \
-		"${rootfs}/etc/runlevels/sysinit/"
+		"${rootfs_dir}/etc/runlevels/sysinit/"
 
 	# for openrc debugging
-	echo 'rc_logger="YES"' | sudo_append "${rootfs}/etc/rc.conf"
-	echo 'rc_verbose="YES"' | sudo_append "${rootfs}/etc/rc.conf"
+	echo 'rc_logger="YES"' | sudo_append "${rootfs_dir}/etc/rc.conf"
+	echo 'rc_verbose="YES"' | sudo_append "${rootfs_dir}/etc/rc.conf"
 }
 
 setup_initrd_boot() {
@@ -225,11 +221,16 @@ alpine_os_mirror="http://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/"
 
 get_default_packages() {
 	local default_packages="
+		busybox-initscripts
+		dropbear
+		dropbear-scp
 		efibootmgr
 		efivar-libs
 		file
+		haveged
 		net-tools
 		netcat-openbsd
+		openrc
 		pciutils
 		strace
 		tcpdump
