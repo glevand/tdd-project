@@ -1,55 +1,50 @@
 #!/usr/bin/env bash
 
 usage() {
+	local target_list
+	target_list="$(make_one_line_list "${known_targets}")"
+
+	local op_list
+	op_list="$(make_multi_line_list "${known_ops}")"
+
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
-
-	local target_list
-	target_list="$(clean_ws "${targets}")"
-
-	local op_list
-	op_list="$(clean_ws "${ops}")"
-
 	{
 		echo "${script_name} - Builds linux kernel."
-		echo "Usage: ${script_name} [flags] <target> <kernel_src> <op>"
+		echo "Usage: ${script_name} [flags] <op>"
 		echo ''
 		echo 'Option flags:'
+		echo "  -t --target           - Build target.  Default: '${target}'."
+		echo "  -k --kernel-src       - Kernel source directory.  Default : '${kernel_src}'."
 		echo "  -b --build-dir        - Build directory. Default: '${build_dir}'."
 		echo "  -i --install-dir      - Target install directory. Default: '${install_dir}'."
 		echo "  -l --local-version    - Default: '${local_version}'."
 		echo "  -p --toolchain-prefix - Default: '${toolchain_prefix}'."
-		echo "  -V --vbuild           - Verbose kernel build."
+		echo "  -V --vbuild           - Verbose kernel build. Default: '${vbuild}'."
 		echo "  -h --help             - Show this help and exit."
 		echo "  -v --verbose          - Verbose execution."
 		echo "  -g --debug            - Extra verbose execution."
 		echo ''
-		echo 'Args:'
-		echo "  <target>     - Build target.  Default: '${target}'."
-		echo "  <kernel-src> - Kernel source directory.  Default : '${kernel_src}'."
-		echo "  <op>         - Build operation.  Default: '${op}'."
+		echo "Known targets: ${target_list}"
 		echo ''
-		echo "  Known targets: ${target_list}"
-		echo ''
-		echo "  Known ops: ${op_list}"
+		echo "Known ops: ${op_list}"
 		echo ''
 		echo 'System Info:'
 		echo "  ${cpus} CPUs available."
 		echo ''
 		echo 'Info:'
-		echo "  ${script_name} (@PACKAGE_NAME@) version @PACKAGE_VERSION@"
-		echo "  @PACKAGE_URL@"
-		echo "  Send bug reports to: Geoff Levand <geoff@infradead.org>."
+		echo "  @PACKAGE_NAME@ ${script_name}"
+		echo "  Version: @PACKAGE_VERSION@"
+		echo "  Project Home: @PACKAGE_URL@"
 	} >&2
-
 	eval "${old_xtrace}"
 }
 
 process_opts() {
-	local short_opts="b:i:l:p:Vhvg"
-	local long_opts="build-dir:,install-dir:,local-version:,\
-toolchain-prefix:,vbuild,help,verbose,debug"
+	local short_opts="t:k:b:i:l:p:Vhvg"
+	local long_opts="target:,kernel-src:,build-dir:,install-dir:,\
+local-version:,toolchain-prefix:,vbuild,help,verbose,debug"
 
 	local opts
 	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
@@ -59,6 +54,14 @@ toolchain-prefix:,vbuild,help,verbose,debug"
 	while true ; do
 		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
 		case "${1}" in
+		-t | --target)
+			target="${2}"
+			shift 2
+			;;
+		-s | --kernel-src)
+			kernel_src="${2}"
+			shift 2
+			;;
 		-b | --build-dir)
 			build_dir="${2}"
 			shift 2
@@ -95,13 +98,11 @@ toolchain-prefix:,vbuild,help,verbose,debug"
 			;;
 		--)
 			shift
-			target="${1:-}"
-			kernel_src="${2:-}"
-			op="${3:-}"
-			if [[ ${4:-} ]]; then
-				shift 3
-				extra_args="${*}"
+			if [[ "${1:-}" ]]; then
+				op="${1}"
+				shift
 			fi
+			extra_args="${*}"
 			break
 			;;
 		*)
@@ -114,39 +115,52 @@ toolchain-prefix:,vbuild,help,verbose,debug"
 
 on_exit() {
 	local result=${?}
+
 	local end_time
-	local sec
-	local kernel_rev
-
 	end_time="$(date +%Y.%m.%d-%H.%M.%S)"
-	sec="${SECONDS}"
-	kernel_rev="$(git -C ${kernel_src} show --no-patch --pretty='format:%h')"
 
-	if [ -d "${tmp_dir:-}" ]; then
-		rm -rf "${tmp_dir:?}"
+	local sec
+	sec="${SECONDS}"
+	
+	local kernel_rev
+	if [[ -d "${kernel_src}" ]]; then
+		kernel_rev="$(git -C ${kernel_src} show --no-patch --pretty='format:%h')"
+	else
+		kernel_rev=''
+	fi
+
+	if [[ -d "${tmp_dir:-}" ]]; then
+		if [[ ${keep_tmp_dir:-} ]]; then
+			echo "${script_name}: INFO: tmp dir preserved: '${tmp_dir}'" >&2
+		else
+			rm -rf "${tmp_dir:?}"
+		fi
 	fi
 
 	{
-		echo ''
-		echo '======================================================================'
-		echo 'ccache info:'
-		echo '======================================================================'
-		echo ''
-		#${ccache} --show-config
-		${ccache} --show-stats
-
-		echo ''
-		echo '======================================================================'
-		echo 'stderr:'
-		echo '======================================================================'
-
-		if [[ -s "${stderr_out}" ]]; then
+		if [[ ${ccache} ]]; then
 			echo ''
-			cat "${stderr_out}"
+			echo '======================================================================'
+			echo 'ccache info:'
+			echo '======================================================================'
+			echo ''
+			#${ccache} --show-config
+			${ccache} --show-stats
+			echo ''
+			echo '======================================================================'
 		fi
 
-		echo ''
-		echo '======================================================================'
+		if [[ ${stderr_out} ]]; then
+			echo 'stderr:'
+			echo '======================================================================'
+
+			if [[ -s "${stderr_out}" ]]; then
+				echo ''
+				cat "${stderr_out}"
+			fi
+			echo ''
+			echo '======================================================================'
+		fi
 	} >&2
 
 	local color
@@ -184,14 +198,17 @@ on_err() {
 	local line_no=${2}
 	local err_no=${3}
 
-	if [[ ${on_err_debug} ]]; then
-		{
+	keep_tmp_dir=1
+
+	{
+		if [[ ${on_err_debug:-} ]]; then
 			echo '------------------------'
 			set
 			echo '------------------------'
-		} >&2
-	fi
-	echo "${script_name}: ERROR: (${err_no}) at ${f_name}:${line_no}." >&2
+		fi
+		echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}"
+	} >&2
+
 	exit "${err_no}"
 }
 
@@ -224,6 +241,8 @@ run_install_image() {
 	cp "${build_dir}"/{defconfig,System.map,vmlinux} "${install_dir}/boot/"
 	cp "${build_dir}/.config" "${install_dir}/boot/config"
 	"${toolchain_prefix}strip" -s -R .comment "${build_dir}/vmlinux" -o "${install_dir}/boot/vmlinux.strip"
+
+	echo "target_copy count = '${#target_copy[@]}'"
 
 	if (( ${#target_copy[@]} == 0 )); then
 		run_cmd_tee "${make_cmd} ${make_options} install"
@@ -367,15 +386,45 @@ set_target_variables() {
 export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
 
 script_name="${0##*/}"
-# base_name="${script_name%.sh}"
 
-start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 SECONDS=0
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
 real_source="$(realpath "${BASH_SOURCE}")"
 SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
-targets='
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+trap 'on_err SIGUSR1 ? 3' SIGUSR1
+
+set -eE
+set -o pipefail
+set -o nounset
+
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+
+host_arch="$(get_host_arch)"
+
+target="${host_arch}"
+kernel_src=''
+op='help'
+build_dir=''
+install_dir=''
+local_version=''
+toolchain_prefix=''
+vbuild=''
+usage=''
+verbose=''
+debug=''
+extra_args=''
+
+ccache=''
+stderr_out=''
+make_options=''
+
+process_opts "${@}"
+
+known_targets='
 	amd64
 	arm32
 	arm64
@@ -390,7 +439,7 @@ targets='
 
 target_ops='defaults'
 
-ops="
+known_ops="
 	all: fresh ${target_ops} install_image install_modules
 	all-no-mod: fresh ${target_ops} install_image
 	build: ${target_ops}
@@ -411,39 +460,13 @@ ops="
 	xconfig
 "
 
-trap "on_exit 'Failed'" EXIT
-trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
-
-set -eE
-set -o pipefail
-set -o nounset
-
-source "${SCRIPT_TOP}/tdd-lib/util.sh"
-
+on_err_debug=''
 cpus="$(cpu_count)"
 
 ccache="${ccache:-ccache }"
-
-build_dir=''
-install_dir=''
-local_version=''
-toolchain_prefix=''
-vbuild=''
-usage=''
-verbose=''
-debug=''
-extra_args=''
-
-make_options=''
-stderr_out=''
-on_err_debug=''
-
-process_opts "${@}"
-
 toolchain_prefix="${toolchain_prefix:-$(default_toolchain_prefix "${target}")}"
-set_target_variables "${target}"
 
-echo "target_copy count = '${#target_copy[@]}'"
+set_target_variables "${target}"
 
 if [[ ! ${build_dir} ]]; then
 	build_dir="$(pwd)/${target}-kernel-build"
@@ -488,10 +511,6 @@ if [[ ${extra_args} ]]; then
 	exit 1
 fi
 
-mkdir -p "${build_dir}"
-mkdir -p "${install_dir}"
-rm -f "${stderr_out}"
-
 check_directory "${kernel_src}" '' 'usage'
 
 if [[ ! -f "${kernel_src}/Documentation/CodingStyle" ]]; then
@@ -527,15 +546,14 @@ else
 	depmod="${depmod:- DEPMOD=/bin/true}"
 fi
 
-make_options=" \
- -j${cpus} \
- ${target_make_options}${depmod} \
- INSTALL_MOD_PATH='${install_dir}' \
- INSTALL_PATH='${install_dir}/boot' \
- INSTALLKERNEL=non-existent-file \
- O='${build_dir}' \
- ${make_options_extra} \
- ${make_options_user} \
+make_options="-j${cpus}\
+ ${target_make_options}${depmod}\
+ INSTALL_MOD_PATH='${install_dir}'\
+ INSTALL_PATH='${install_dir}/boot'\
+ INSTALLKERNEL=non-existent-file\
+ O='${build_dir}'\
+ ${make_options_extra}\
+ ${make_options_user}\
 "
 
 export CCACHE_DIR=${CCACHE_DIR:-"${build_dir}.ccache"}
@@ -543,7 +561,9 @@ export CCACHE_MAXSIZE="8G"
 export CCACHE_NLEVELS="4"
 
 mkdir -p "${build_dir}"
+echo -n '' > "${stderr_out}"
 mkdir -p "${CCACHE_DIR}"
+mkdir -p "${install_dir}"
 
 cd "${kernel_src}"
 
