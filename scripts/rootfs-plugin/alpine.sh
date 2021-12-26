@@ -164,7 +164,11 @@ setup_login() {
 		's|#ttyS0|ttyS0|g' \
 		"${rootfs}/etc/inittab"
 
-	egrep 'ttyS0' "${rootfs}/etc/inittab" | sed 's|ttyS0|ttyAMA0|g' | sudo_append "${rootfs}/etc/inittab"
+	if [[ "${target_arch}" = 'arm'* ]]; then
+		egrep 'ttyS0' "${rootfs}/etc/inittab" | \
+			sed 's|ttyS0|ttyAMA0|g' | \
+			sudo_append "${rootfs}/etc/inittab"
+	fi
 }
 
 setup_sshd() {

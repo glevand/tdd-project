@@ -407,23 +407,29 @@ print_usage_summary() {
 
 	rootfs_size="$(file_size_human "${rootfs_dir}")"
 
-	echo "${script_name}: INFO: Rootfs size:  ${rootfs_size} MiB"
+	echo "${script_name}: INFO: Rootfs size:  ${rootfs_size}"
 
 	if [[ -d "${kernel_modules}" ]]; then
-		local modules_size
+		local rootfs_bytes
+		local modules_bytes
 		local base_size
 
+		rootfs_bytes="$(file_size_bytes "${rootfs_dir}")"
+		modules_bytes="$(file_size_bytes "${kernel_modules}")"
+		base_size="$(bc <<< "(${rootfs_bytes} - ${modules_bytes}) / 1048576")"
+		echo "${script_name}: INFO: Base size:    ${base_size}M"
+
+		local modules_size
+
 		modules_size="$(file_size_human "${kernel_modules}")"
-		base_size="$(bc <<< "${rootfs_size} - ${modules_size}")"
-		echo "${script_name}: INFO: Base size:    ${base_size} MiB"
-		echo "${script_name}: INFO: Modules size: ${modules_size} MiB"
+		echo "${script_name}: INFO: Modules size: ${modules_size}"
 	fi
 
 	if [[ -f "${initrd}" ]]; then
 		local initrd_size
 
 		initrd_size="$(file_size_human "${initrd}")"
-		echo "${script_name}: INFO: initrd size:  ${initrd_size} MiB"
+		echo "${script_name}: INFO: Initrd size:  ${initrd_size}"
 	fi
 }
 
@@ -462,7 +468,7 @@ source "${SCRIPT_TOP}/tdd-lib/util.sh"
 source "${SCRIPT_TOP}/lib/chroot.sh"
 
 sudo='sudo -S'
-host_arch="$(get_arch "$(uname -m)")"
+host_arch="$(get_host_arch)"
 
 target_arch="${host_arch}"
 rootfs_type='debian'
@@ -470,7 +476,7 @@ minimal_install=''
 clean_rootfs=''
 output_disk_image=''
 bootstrap_dir=''
-output_dir="$(realpath "$(pwd)/${target_arch}-${rootfs_type}-rootfs")"
+output_dir=''
 usage=''
 verbose=''
 debug=''
@@ -485,12 +491,12 @@ keep_tmp_dir=''
 
 process_opts "${@}"
 
-TARGET_HOSTNAME="${TARGET_HOSTNAME:-"tdd-tester"}"
+TARGET_HOSTNAME="${TARGET_HOSTNAME:-tdd-tester}"
 
 source "${SCRIPT_TOP}/rootfs-plugin/rootfs-plugin.sh"
 source "${SCRIPT_TOP}/rootfs-plugin/${rootfs_type}.sh"
 
-output_dir="$(realpath -m "${output_dir}")"
+output_dir="${output_dir:-$(realpath "$(pwd)/${target_arch}-${rootfs_type}-rootfs")}"
 image_dir="$(realpath -m "${output_dir}/${target_arch}-${rootfs_type}.image")"
 bootstrap_dir="${bootstrap_dir:-$(realpath -m "${output_dir}/${target_arch}-${rootfs_type}.bootstrap")}"
 
