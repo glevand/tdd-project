@@ -118,6 +118,8 @@ setup_packages() {
 	shift 1
 	local packages="${@//,/ }"
 
+	echo "packages: @${packages}@"
+
 	enter_chroot "${rootfs_dir}" "
 		set -e
 		apk add "${packages}"
@@ -223,22 +225,48 @@ EOF
 
 alpine_os_mirror="http://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/"
 
-get_default_packages() {
-	local default_packages="
+get_packages() {
+	local type=${1}
+
+	local base_packages="
 		busybox-initscripts
 		dropbear
+		haveged
+		openrc
+	"
+
+	local extra_packages="
 		dropbear-scp
 		efibootmgr
 		efivar-libs
 		file
-		haveged
 		net-tools
 		netcat-openbsd
-		openrc
 		pciutils
 		strace
 		tcpdump
 	"
 
-	echo "${default_packages}"
+	case "${type}" in
+	'base')
+		echo "${base_packages}"
+		return
+		;;
+	'all')
+		echo "${base_packages} ${extra_packages}"
+		return
+		;;
+	*)
+		echo "${FUNCNAME[0]}: ERROR: Bad type: '${type}'" >&2
+		exit 1
+		;;
+	esac
+}
+
+get_base_packages() {
+	get_packages 'base'
+}
+
+get_all_packages() {
+	get_packages 'all'
 }

@@ -326,7 +326,7 @@ setup_password() {
 	local rootfs=${1}
 	local pw=${2}
 
-	pw="${pw:-"r"}"
+	pw="${pw:-r}"
 	echo "${script_name}: INFO: Login password = '${pw}'." >&2
 
 	local i
@@ -573,12 +573,18 @@ if [[ ${step_rootfs_setup} ]]; then
 	mkdir -p "${rootfs_dir}"
 	${sudo} rsync -a --delete "${bootstrap_dir}/" "${rootfs_dir}/"
 
-	setup_initrd_boot "${rootfs_dir}"
-	setup_login "${rootfs_dir}" ''
-	setup_network "${rootfs_dir}"
-
-	if [[ ! ${minimal_install} ]]; then
-		setup_packages "${rootfs_dir}" "$(get_default_packages) ${extra_packages}"
+	if [[ ${minimal_install} ]]; then
+		setup_packages "${rootfs_dir}" "$(get_base_packages) ${extra_packages}"
+		setup_initrd_boot "${rootfs_dir}"
+		setup_login "${rootfs_dir}" ''
+		setup_network "${rootfs_dir}"
+		setup_sshd "${rootfs_dir}" "${server_key}"
+		setup_ssh_keys "${rootfs_dir}" "${login_key}"
+	else
+		setup_packages "${rootfs_dir}" "$(get_all_packages) ${extra_packages}"
+		setup_initrd_boot "${rootfs_dir}"
+		setup_login "${rootfs_dir}" ''
+		setup_network "${rootfs_dir}"
 		setup_sshd "${rootfs_dir}" "${server_key}"
 		setup_ssh_keys "${rootfs_dir}" "${login_key}"
 		setup_kernel_modules "${rootfs_dir}" "${kernel_modules}"
