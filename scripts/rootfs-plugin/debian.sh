@@ -219,22 +219,46 @@ EOF
 	"
 }
 
-get_default_packages() {
-	local default_packages="
-		file
+get_packages() {
+	local type=${1}
+
+	local base_packages="
 		haveged
+		openssh-server
+	"
+
+	local extra_packages="
+		efibootmgr
+		file
 		login
 		net-tools
 		netcat-openbsd
-		openssh-server
 		pciutils
 		strace
 		tcpdump
 	"
 
-	if [[ ${target_arch} == "arm64" ]]; then
-		echo "${default_packages} efibootmgr firmware-qlogic firmware-bnx2x"
-	else
-		echo ${default_packages}
-	fi
+	case "${type}" in
+	'base')
+		echo "${base_packages}"
+		return
+		;;
+	'all')
+		echo "${base_packages} ${extra_packages}"
+		return
+		;;
+	*)
+		echo "${FUNCNAME[0]}: ERROR: Bad type: '${type}'" >&2
+		exit 1
+		;;
+	esac
 }
+
+get_base_packages() {
+	get_packages 'base'
+}
+
+get_all_packages() {
+	get_packages 'all'
+}
+
