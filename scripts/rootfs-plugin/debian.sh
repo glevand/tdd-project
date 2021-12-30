@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+#
 # Debian plug-in routines for build-rootfs.sh.
 #
 # @PACKAGE_NAME@ ${script_name}"
@@ -61,7 +63,7 @@ bootstrap_rootfs() {
 	${sudo} chown root: "${rootfs}/"
 
 	(${sudo} debootstrap --foreign --arch "${debian_arch}" --no-check-gpg \
-		${debootstrap_extra} \
+		"${debootstrap_extra}" \
 		"${debian_os_release}" "${rootfs}" "${debian_os_mirror}")
 
 	stat "${rootfs}/" "${rootfs}/dev" "${rootfs}/var" || :
@@ -75,7 +77,7 @@ bootstrap_rootfs() {
 
 	${sudo} mount -l -t proc
 	${sudo} ls -la "${rootfs}"
-	${sudo} find "${rootfs}" -type l -exec ls -la {} \; | egrep ' -> /'
+	${sudo} find "${rootfs}" -type l -exec ls -la {} \; | grep ' -> /'
 
 	setup_chroot_mounts "${rootfs}"
 
@@ -102,11 +104,11 @@ EOF
 setup_packages() {
 	local rootfs=${1}
 	shift 1
-	local packages="${@//,/ }"
+	local packages="${*//,/ }"
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
-	enter_chroot ${rootfs} "
+	enter_chroot "${rootfs}" "
 		DEBIAN_FRONTEND=noninteractive apt-get -y install ${packages}
 	"
 	debug_check "${FUNCNAME[0]}:${LINENO}"
@@ -116,7 +118,7 @@ rootfs_cleanup() {
 	local rootfs=${1}
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
-	enter_chroot ${rootfs} "
+	enter_chroot "${rootfs}" "
 		DEBIAN_FRONTEND=noninteractive apt-get -y clean
 		rm -rf /var/lib/apt/lists/*
 	"
@@ -138,11 +140,11 @@ setup_login() {
 
 	${sudo} sed --in-place \
 		's|-/sbin/agetty -o|-/sbin/agetty --autologin root -o|' \
-		${rootfs}/lib/systemd/system/serial-getty@.service
+		"${rootfs}/lib/systemd/system/serial-getty@.service"
 
 	${sudo} sed --in-place \
 		's|-/sbin/agetty -o|-/sbin/agetty --autologin root -o|' \
-		${rootfs}/lib/systemd/system/getty@.service
+		"${rootfs}/lib/systemd/system/getty@.service"
 }
 
 setup_network() {
@@ -160,7 +162,7 @@ setup_sshd() {
 		local value=${2}
 		
 		${sudo} sed --in-place "s/^${key}.*$//" \
-			${rootfs}/etc/ssh/sshd_config
+			"${rootfs}/etc/ssh/sshd_config"
 		echo "${key} ${value}" | sudo_append "${rootfs}/etc/ssh/sshd_config"
 	}
 
@@ -212,7 +214,7 @@ EOF
 #systemd-networkd-wait-online.service: Failed with result 'exit-code'.
 #Startup finished in 16.250s (kernel) + 0 (initrd) + 2min 2.838s (userspace) = 2min 19.089s.
 
-	enter_chroot ${rootfs} "
+	enter_chroot "${rootfs}" "
 		systemctl enable \
 			${tdd_service} \
 			systemd-networkd-wait-online.service \

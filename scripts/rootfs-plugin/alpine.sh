@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+#
 # Alpine linux plug-in routines for build-rootfs.sh.
 #
 # @PACKAGE_NAME@ ${script_name}"
@@ -28,14 +30,14 @@ download_minirootfs() {
 
 	mkdir -p "${download_dir}"
 
-	pushd "${download_dir}"
+	pushd "${download_dir}" || exit 1
 
 	local releases_yaml='latest-releases.yaml'
 
 	wget "${base_url}/${releases_yaml}"
 
 	local latest
-	latest="$(egrep --only-matching "file: alpine-minirootfs-[0-9.]*-${alpine_arch}.tar.gz" "${releases_yaml}")"
+	latest="$(grep --only-matching "file: alpine-minirootfs-[0-9.]*-${alpine_arch}.tar.gz" "${releases_yaml}")"
 
 	if [[ ! ${latest} ]]; then
 		echo "${script_name}: ERROR: Bad releases file '${releases_yaml}'." >&2
@@ -46,7 +48,7 @@ download_minirootfs() {
 	latest="${latest##* }"
 	wget "${base_url}/${latest}"
 
-	popd
+	popd || exit 1
 
 	echo "${script_name}: INFO: Download '${latest}'." >&2
 
@@ -116,13 +118,13 @@ rootfs_cleanup() {
 setup_packages() {
 	local rootfs_dir=${1}
 	shift 1
-	local packages="${@//,/ }"
+	local packages="${*//,/ }"
 
 	echo "packages: @${packages}@"
 
 	enter_chroot "${rootfs_dir}" "
 		set -e
-		apk add "${packages}"
+		apk add ${packages}
 		apk info | sort
 	"
 
@@ -132,7 +134,7 @@ setup_packages() {
 	${sudo} ln -s "/etc/init.d"/{devfs,dmesg,mdev,hwdrivers} \
 		"${rootfs_dir}/etc/runlevels/sysinit/"
 
-	${sudo} ln -s "/etc/init.d/"{networking} \
+	${sudo} ln -s "/etc/init.d/networking" \
 		"${rootfs_dir}/etc/runlevels/default/"
 
 	${sudo} ln -s "/etc/init.d/"{mount-ro,killprocs,savecache} \
@@ -167,7 +169,7 @@ setup_login() {
 		"${rootfs}/etc/inittab"
 
 	if [[ "${target_arch}" = 'arm'* ]]; then
-		egrep 'ttyS0' "${rootfs}/etc/inittab" | \
+		grep 'ttyS0' "${rootfs}/etc/inittab" | \
 			sed 's|ttyS0|ttyAMA0|g' | \
 			sudo_append "${rootfs}/etc/inittab"
 	fi
@@ -187,7 +189,7 @@ setup_sshd() {
 
 	#echo "${script_name}: USER=@$(id --user --real --name)@" >&2
 	${sudo} cp -f "${rootfs}/etc/dropbear/dropbear_rsa_host_key" "${srv_key}"
-	${sudo} chown $(id --user --real --name): "${srv_key}"
+	${sudo} chown "$(id --user --real --name)": "${srv_key}"
 
 	#echo 'DROPBEAR_OPTS=""' | sudo_write ${rootfs}/etc/conf.d/dropbear
 }
@@ -223,7 +225,7 @@ EOF
 	${sudo} ln -s "${tdd_service}" "${rootfs}/etc/runlevels/sysinit/"
 }
 
-alpine_os_mirror="http://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/"
+alpine_os_mirror="http://dl-cdn.alpinelinux.org/alpine/latest-stable/releases"
 
 get_packages() {
 	local type=${1}
