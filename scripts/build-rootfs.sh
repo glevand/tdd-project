@@ -5,13 +5,13 @@ usage() {
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
 	{
-		echo "${script_name} - Builds a minimal Linux disk image."
+		echo "${script_name} - Builds a small Linux disk image."
 		echo "Usage: ${script_name} [flags]"
 		echo "Option flags:"
-		echo "  -a --arch           - Target architecture {$(clean_ws ${known_arches})}. Default: '${target_arch}'."
-		echo "  -t --rootfs-type    - Rootfs type {$(clean_ws ${known_rootfs_types})}. Default: '${rootfs_type}'."
-		echo "  -m --minimal        - Install no extra packages. Default: '${minimal_install}'."
-		echo "  -c --clean-rootfs   - Remove bootstrap and rootfs directories. Default: '${clean_rootfs}'"
+		echo "  -a --arch           - Target architecture {${known_arches}}. Default: '${target_arch}'."
+		echo "  -t --rootfs-type    - Rootfs type {${known_rootfs_types}}. Default: '${rootfs_type}'."
+		echo "  -m --minimal        - Build minimal image. Install no extra packages. Default: '${minimal_install}'."
+		echo "  -c --clean-rootfs   - Remove bootstrap and rootfs working directories. Default: '${clean_rootfs}'"
 		echo "  -i --disk-image     - Generate a binary disk image file: '${output_disk_image}'."
 		echo "  --bootstrap-dir     - Bootstrap directory. Default: '${bootstrap_dir}'."
 		echo "  --output-dir        - Output directory:   '${output_dir}'."
@@ -21,12 +21,13 @@ usage() {
 		echo "  -h --help           - Show this help and exit."
 		echo "  -v --verbose        - Verbose execution. Default: '${verbose}'."
 		echo "  -g --debug          - Extra verbose execution. Default: '${debug}'."
-		echo "  -d --dry-run        - Dry run, don't run commands."
+# 		echo "  -d --dry-run        - Dry run, don't run commands. Default: '${dry_run}'."
 		echo "Option steps:"
 		echo "  -1 --bootstrap      - Run bootstrap rootfs step. Default: '${step_bootstrap}'."
 		echo "  -2 --rootfs-setup   - Run rootfs setup step. Default: '${step_rootfs_setup}'."
 		echo "     --kernel-modules - Kernel modules to install. Default: '${kernel_modules}'."
-		echo "     --extra-packages - Extra distro packages. Default: '${extra_packages}'."
+		echo "     --extra-packages - Extra packages to install. Default: '${extra_packages}'."
+		echo "     --hostname       - Target hostname. Default: '${target_hostname}'."
 		echo "  -3 --make-image     - Run make image step. Default: '${step_make_image}'."
 	} >&2
 	eval "${old_xtrace}"
@@ -34,9 +35,18 @@ usage() {
 
 process_opts() {
 	local short_opts="a:t:mcikp:123hvgd"
-	local long_opts="arch:,rootfs-type:,minimal,clean-rootfs,disk-image,\
-kernel-modules:,extra-packages:bootstrap-dir:,output-dir:,\
-bootstrap,rootfs-setup,make-image,help,verbose,debug,dry-run"
+	local long_opts="\
+arch:,\
+rootfs-type:,\
+minimal,\
+clean-rootfs,\
+disk-image,\
+bootstrap-dir:,\
+output-dir:,\
+help,verbose,debug,dry-run,\
+bootstrap,\
+rootfs-setup,kernel-modules:,extra-packages:,hostname:,\
+make-image"
 
 	local opts
 	opts=$(getopt --options "${short_opts}" --long "${long_opts}" -n "${script_name}" -- "${@}")
@@ -66,14 +76,6 @@ bootstrap,rootfs-setup,make-image,help,verbose,debug,dry-run"
 			output_disk_image=1
 			shift
 			;;
-		-k | --kernel-modules)
-			kernel_modules="${2}"
-			shift 2
-			;;
-		-p | --extra-packages)
-			extra_packages="${2}"
-			shift 2
-			;;
 		--bootstrap-dir)
 			bootstrap_dir="${2}"
 			shift 2
@@ -82,17 +84,9 @@ bootstrap,rootfs-setup,make-image,help,verbose,debug,dry-run"
 			output_dir="${2}"
 			shift 2
 			;;
-		-1 | --bootstrap)
-			step_bootstrap=1
-			shift
-			;;
-		-2 | --rootfs-setup)
-			step_rootfs_setup=1
-			shift
-			;;
-		-3 | --make-image)
-			step_make_image=1
-			shift
+		--hostname)
+			target_hostname="${2}"
+			shift 2
 			;;
 		-h | --help)
 			usage=1
@@ -110,7 +104,27 @@ bootstrap,rootfs-setup,make-image,help,verbose,debug,dry-run"
 			shift
 			;;
 		-d | --dry-run)
-			dry_run=1
+# 			dry_run=1
+			shift
+			;;
+		-1 | --bootstrap)
+			step_bootstrap=1
+			shift
+			;;
+		-2 | --rootfs-setup)
+			step_rootfs_setup=1
+			shift
+			;;
+		-k | --kernel-modules)
+			kernel_modules="${2}"
+			shift 2
+			;;
+		-p | --extra-packages)
+			extra_packages="${2}"
+			shift 2
+			;;
+		-3 | --make-image)
+			step_make_image=1
 			shift
 			;;
 		--)
@@ -119,7 +133,7 @@ bootstrap,rootfs-setup,make-image,help,verbose,debug,dry-run"
 			break
 			;;
 		*)
-			echo "${script_name}: ERROR: Internal opts: '${@}'" >&2
+			echo "${script_name}: ERROR: Internal opts: '${*}'" >&2
 			exit 1
 			;;
 		esac
@@ -193,7 +207,11 @@ check_kernel_modules() {
 			usage
 			exit 1
 		fi
-		if [[ "$(basename $(cd ${dir}/.. && pwd))" != "modules" ]]; then
+
+		local check="${dir%/*}"
+		check="${check##*/}"
+
+		if [[ "${check}" != 'modules' ]]; then
 			echo "${script_name}: ERROR: No kernel modules found in '${dir}'" >&2
 			usage
 			exit 1
@@ -228,7 +246,7 @@ test_step_code() {
 setup_network_ifupdown() {
 	local rootfs=${1}
 
-	echo "${TARGET_HOSTNAME}" | sudo_write "${rootfs}/etc/hostname"
+	echo "${target_hostname}" | sudo_write "${rootfs}/etc/hostname"
 
 	sudo_append "${rootfs}/etc/network/interfaces" <<EOF
 auto lo
@@ -268,7 +286,7 @@ EOF
 setup_network_systemd() {
 	local rootfs=${1}
 
-	echo "${TARGET_HOSTNAME}" | sudo_write "${rootfs}/etc/hostname"
+	echo "${target_hostname}" | sudo_write "${rootfs}/etc/hostname"
 
 	sudo_append "${rootfs}/etc/systemd/network/dhcp.network" <<EOF
 [Match]
@@ -286,14 +304,14 @@ setup_ssh_keys() {
 	${sudo} mkdir -p -m0700 "${rootfs}/root/.ssh"
 
 	ssh-keygen -q -f "${key_file}" -N ''
-	cat "${key_file}.pub" | sudo_append "${rootfs}/root/.ssh/authorized_keys"
+	sudo_append "${rootfs}/root/.ssh/authorized_keys2" < "${key_file}.pub"
 
 	local user_key
 	for user_key in "${HOME}"/.ssh/*.pub; do
 		if [[ ! -f "${user_key}" ]]; then
 			continue
 		fi
-		cat "${user_key}" | sudo_append "${rootfs}/root/.ssh/authorized_keys"
+		sudo_append "${rootfs}/root/.ssh/authorized_keys" < "${user_key}"
 	done
 }
 
@@ -319,7 +337,7 @@ setup_kernel_modules() {
 		--exclude '/build' --exclude '/source' \
 		"${src}/" "${dest}/"
 
-	echo "${script_name}: INFO: Kernel modules size: $(file_size_human ${dest})"
+	echo "${script_name}: INFO: Kernel modules size: $(file_size_human "${dest}")"
 }
 
 setup_password() {
@@ -332,7 +350,7 @@ setup_password() {
 	local i
 	local hash
 	for ((i = 0; ; i++)); do
-		hash="$(openssl passwd -1 -salt tdd${i} "${pw}")"
+		hash="$(openssl passwd -1 -salt "tdd${i}" "${pw}")"
 		if [[ "${hash/\/}" == "${hash}" ]]; then
 			break
 		fi
@@ -449,7 +467,7 @@ export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[
 script_name="${0##*/}"
 
 SECONDS=0
-start_time="$(date +%Y.%m.%d-%H.%M.%S)"
+# start_time="$(date +%Y.%m.%d-%H.%M.%S)"
 
 trap "on_exit 'Failed'" EXIT
 trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
@@ -459,12 +477,14 @@ set -eE
 set -o pipefail
 set -o nounset
 
-real_source="$(realpath "${BASH_SOURCE}")"
+real_source="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
 
 RELAY_TOP="${RELAY_TOP:-$(realpath "${SCRIPT_TOP}/../relay")}"
 
+# shellcheck source=./tdd-lib/util.sh
 source "${SCRIPT_TOP}/tdd-lib/util.sh"
+# shellcheck source=./lib/chroot.sh
 source "${SCRIPT_TOP}/lib/chroot.sh"
 
 sudo='sudo -S'
@@ -477,10 +497,11 @@ clean_rootfs=''
 output_disk_image=''
 bootstrap_dir=''
 output_dir=''
+target_hostname='tdd-tester'
 usage=''
 verbose=''
 debug=''
-dry_run=''
+# dry_run=''
 step_bootstrap=''
 step_rootfs_setup=''
 kernel_modules=''
@@ -491,8 +512,7 @@ keep_tmp_dir=''
 
 process_opts "${@}"
 
-TARGET_HOSTNAME="${TARGET_HOSTNAME:-tdd-tester}"
-
+# shellcheck source=./rootfs-plugin/rootfs-plugin.sh
 source "${SCRIPT_TOP}/rootfs-plugin/rootfs-plugin.sh"
 source "${SCRIPT_TOP}/rootfs-plugin/${rootfs_type}.sh"
 
@@ -527,7 +547,7 @@ ${sudo} true
 cleanup_chroot "${rootfs_dir}"
 cleanup_chroot "${bootstrap_dir}"
 
-tmp_dir="$(mktemp --tmpdir --directory ${script_name}.XXXX)"
+tmp_dir="$(mktemp --tmpdir --directory "${script_name}".XXXX)"
 need_clean_rootfs=''
 
 if [[ ${step_bootstrap} ]]; then
@@ -540,7 +560,7 @@ if [[ ${step_bootstrap} ]]; then
 	delete_dir "${bootstrap_dir:?}"
 	mkdir -p "${bootstrap_dir}"
 
-	trap "on_fail ${bootstrap_dir} none" EXIT
+	trap 'on_fail ${bootstrap_dir} none' EXIT
 	bootstrap_rootfs "${bootstrap_dir}"
 
 	user_id="$(id --user --real --name)"
@@ -549,7 +569,7 @@ if [[ ${step_bootstrap} ]]; then
 	{
 		echo "${script_name}: INFO: Step ${current_step} (${rootfs_type}): Done."
 		echo "${script_name}: INFO: Bootstrap files in '${bootstrap_dir}'."
-		echo "${script_name}: INFO: Bootstrap size: $(file_size_human ${bootstrap_dir})"
+		echo "${script_name}: INFO: Bootstrap size: $(file_size_human "${bootstrap_dir}")"
 	} >&2
 fi
 
@@ -565,10 +585,12 @@ if [[ ${step_rootfs_setup} ]]; then
 	check_directory "${bootstrap_dir}" ' bootstrap dir' ''
 	check_directory "${bootstrap_dir}/usr/bin" ' bootstrap/usr/bin' ''
 
-	check_directory "${kernel_modules}" ' kernel modules' ''
-	check_kernel_modules "${kernel_modules}"
+	if [[ "${kernel_modules}" != 'none' ]]; then
+		check_directory "${kernel_modules}" ' kernel modules' ''
+		check_kernel_modules "${kernel_modules}"
+	fi
 
-	trap "on_fail ${rootfs_dir} none" EXIT
+	trap 'on_fail ${rootfs_dir} none' EXIT
 
 	mkdir -p "${rootfs_dir}"
 	${sudo} rsync -a --delete "${bootstrap_dir}/" "${rootfs_dir}/"
@@ -587,7 +609,9 @@ if [[ ${step_rootfs_setup} ]]; then
 		setup_network "${rootfs_dir}"
 		setup_sshd "${rootfs_dir}" "${server_key}"
 		setup_ssh_keys "${rootfs_dir}" "${login_key}"
-		setup_kernel_modules "${rootfs_dir}" "${kernel_modules}"
+		if [[ "${kernel_modules}" != 'none' ]]; then
+			setup_kernel_modules "${rootfs_dir}" "${kernel_modules}"
+		fi
 		setup_relay_client "${rootfs_dir}"
 	fi
 
@@ -619,9 +643,9 @@ if [[ ${step_make_image} ]]; then
 
 	if [[ ${output_disk_image} ]]; then
 		tmp_mnt="${tmp_dir}/tdd-disk-mnt"
-		trap "on_fail ${rootfs_dir} ${tmp_mnt}" EXIT
-		make_disk_img "${rootfs_dir}" ${disk_img} ${tmp_mnt}
-		trap "on_fail ${rootfs_dir} none" EXIT
+		trap 'on_fail ${rootfs_dir} ${tmp_mnt}' EXIT
+		make_disk_img "${rootfs_dir}" "${disk_img}" "${tmp_mnt}"
+		trap 'on_fail ${rootfs_dir} none' EXIT
 		clean_make_disk_img "${tmp_mnt}"
 	fi
 

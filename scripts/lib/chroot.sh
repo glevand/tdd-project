@@ -65,7 +65,7 @@ setup_chroot_mounts() {
 	${sudo} cp '/etc/resolv.conf' "${chroot}/etc/resolv.conf"
 
 	if [[ ${verbose} ]]; then
-		mount | egrep "${chroot}" || :
+		mount | grep "${chroot}" || :
 	fi
 }
 
@@ -73,7 +73,7 @@ clean_chroot_mounts() {
 	local chroot=${1}
 
 	if [[ ${verbose} ]]; then
-		mount | egrep "${chroot}" || :
+		mount | grep "${chroot}" || :
 	fi
 
 	if [[ -f "${chroot}/etc/resolv.conf.o1" ]]; then
@@ -91,7 +91,7 @@ clean_chroot_mounts() {
 enter_chroot() {
 	local chroot=${1}
 	shift
-	local script="${@}"
+	local script="${*}"
 
 	check_directory "${chroot}" '' ''
 	copy_qemu_static "${chroot}"
@@ -115,5 +115,5 @@ cleanup_chroot () {
 	clean_qemu_static "${chroot}"
 	clean_chroot_mounts "${chroot}"
 
-	mount | egrep "${chroot}" || :
+	mount | grep "${chroot}" || :
 }

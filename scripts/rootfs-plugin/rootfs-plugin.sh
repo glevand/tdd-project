@@ -5,8 +5,4 @@
 # Home: @PACKAGE_URL@"
 #
 
-known_rootfs_types="
-	alpine
-	coreos
-	debian
-"
+known_rootfs_types="alpine coreos debian"

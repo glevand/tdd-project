@@ -37,7 +37,7 @@ bootstrap_rootfs() {
 
 	${sudo} mount -l -t proc
 	${sudo} ls -la ${rootfs}
-	${sudo} find ${rootfs} -type l -exec ls -la {} \; | egrep ' -> /'
+	${sudo} find ${rootfs} -type l -exec ls -la {} \; | grep ' -> /'
 	${sudo} rm -f ${rootfs}/proc
 	${sudo} mkdir -p  ${rootfs}/proc
 	${sudo} mount -t proc -o nosuid,nodev,noexec /proc ${rootfs}/proc
