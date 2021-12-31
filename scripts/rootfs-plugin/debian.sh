@@ -242,11 +242,11 @@ get_packages() {
 
 	case "${type}" in
 	'base')
-		echo "${base_packages}"
+		str_trim_space "${base_packages}"
 		return
 		;;
 	'all')
-		echo "${base_packages} ${extra_packages}"
+		str_trim_space "${base_packages} ${extra_packages}"
 		return
 		;;
 	*)
