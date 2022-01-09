@@ -11,13 +11,14 @@ usage() {
 		echo "  -a --arch           - Target architecture {${known_arches}}. Default: '${target_arch}'."
 		echo "  -t --rootfs-type    - Rootfs type {${known_rootfs_types}}. Default: '${rootfs_type}'."
 		echo "  -m --minimal        - Build minimal image. Install no extra packages. Default: '${minimal_install}'."
-		echo "  -c --clean-rootfs   - Remove bootstrap and rootfs working directories. Default: '${clean_rootfs}'"
+		echo "  -l --clean-rootfs   - Remove bootstrap and rootfs working directories. Default: '${clean_rootfs}'"
 		echo "  -i --disk-image     - Generate a binary disk image file: '${output_disk_image}'."
 		echo "  --bootstrap-dir     - Bootstrap directory. Default: '${bootstrap_dir}'."
 		echo "  --output-dir        - Output directory:   '${output_dir}'."
 		echo "                         Root FS:           '${rootfs_dir}'."
 		echo "                         Initrd:            '${initrd}'."
 		echo "                         Binary Disk Image: '${disk_img}'."
+		echo "  -c --config         - Configuration file. Default: '${config_file}'."
 		echo "  -h --help           - Show this help and exit."
 		echo "  -v --verbose        - Verbose execution. Default: '${verbose}'."
 		echo "  -g --debug          - Extra verbose execution. Default: '${debug}'."
@@ -34,7 +35,7 @@ usage() {
 }
 
 process_opts() {
-	local short_opts="a:t:mcikp:123hvgd"
+	local short_opts="a:t:mlikp:123c:hvgd"
 	local long_opts="\
 arch:,\
 rootfs-type:,\
@@ -43,6 +44,7 @@ clean-rootfs,\
 disk-image,\
 bootstrap-dir:,\
 output-dir:,\
+config:,\
 help,verbose,debug,dry-run,\
 bootstrap,\
 rootfs-setup,kernel-modules:,extra-packages:,hostname:,\
@@ -68,7 +70,7 @@ make-image"
 			minimal_install=1
 			shift
 			;;
-		-c | --clean-rootfs)
+		-l | --clean-rootfs)
 			clean_rootfs=1
 			shift
 			;;
@@ -86,6 +88,10 @@ make-image"
 			;;
 		--hostname)
 			target_hostname="${2}"
+			shift 2
+			;;
+		-c | --config)
+			config_file="${2}"
 			shift 2
 			;;
 		-h | --help)
@@ -246,30 +252,25 @@ test_step_code() {
 setup_network_ifupdown() {
 	local rootfs=${1}
 
+	local conf
+
+	if [[ ${network_config} ]]; then
+		conf="${network_config}"
+	else
+		conf='
+auto eth0
+iface eth0 inet dhcp
+
+auto eth1
+iface eth1 inet dhcp'
+	fi
+
 	echo "${target_hostname}" | sudo_write "${rootfs}/etc/hostname"
 
 	sudo_append "${rootfs}/etc/network/interfaces" <<EOF
 auto lo
 iface lo inet loopback
-
-auto eth0
-iface eth0 inet dhcp
-
-auto eth1
-iface eth1 inet dhcp
-
-#auto enP2p1s0v0
-#iface enP2p1s0v0 inet dhcp
-
-#auto enP2p1s0f1
-#iface enP2p1s0f1 inet dhcp
-
-#auto enp9s0f1
-#iface enp9s0f1 inet dhcp
-
-# gbt2s18
-# DHCPREQUEST for 10.112.35.123 on enP2p1s0v0 to 255.255.255.255 port 67
-
+${conf}
 EOF
 }
 
@@ -498,6 +499,8 @@ output_disk_image=''
 bootstrap_dir=''
 output_dir=''
 target_hostname='tdd-tester'
+config_file=''
+config_dir=''
 usage=''
 verbose=''
 debug=''
@@ -509,11 +512,26 @@ extra_packages=''
 step_make_image=''
 
 keep_tmp_dir=''
+network_config=''
+known_rootfs_types=''
+rootfs_dir=''
+initrd=''
+disk_img=''
+
+declare -a server_keys
 
 process_opts "${@}"
 
+if [[ ${config_file} ]]; then
+	check_file "${config_file}" ' config file' 'usage'
+	config_dir="${config_file%/*}"
+	source "${config_file}"
+fi
+
 # shellcheck source=./rootfs-plugin/rootfs-plugin.sh
 source "${SCRIPT_TOP}/rootfs-plugin/rootfs-plugin.sh"
+# shellcheck source=./rootfs-plugin/alpine.sh
+# shellcheck source=./rootfs-plugin/debian.sh
 source "${SCRIPT_TOP}/rootfs-plugin/${rootfs_type}.sh"
 
 output_dir="${output_dir:-$(realpath "$(pwd)/${target_arch}-${rootfs_type}-rootfs")}"
@@ -666,7 +684,6 @@ fi
 if [[ ${need_clean_rootfs} ]]; then
 	delete_rootfs "${rootfs_dir:?}"
 fi
-
 
 trap "on_exit 'Success'" EXIT
 exit 0

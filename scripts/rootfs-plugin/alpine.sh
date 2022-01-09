@@ -143,6 +143,10 @@ setup_packages() {
 	${sudo} ln -s /etc/init.d/{haveged,dropbear} \
 		"${rootfs_dir}/etc/runlevels/sysinit/"
 
+	if [[ ${m_of_the_day} ]]; then
+		echo "${m_of_the_day}" | sudo_write "${rootfs_dir}/etc/motd"
+	fi
+
 	# for openrc debugging
 	echo 'rc_logger="YES"' | sudo_append "${rootfs_dir}/etc/rc.conf"
 	echo 'rc_verbose="YES"' | sudo_append "${rootfs_dir}/etc/rc.conf"
@@ -179,13 +183,18 @@ setup_sshd() {
 	local rootfs=${1}
 	local srv_key=${2}
 
-	enter_chroot "${rootfs}" "
-		set -e
-		mkdir -p /etc/dropbear/
-		/usr/bin/dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key
-		/usr/bin/dropbearkey -t dss -f /etc/dropbear/dropbear_dss_host_key
-		/usr/bin/dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key
-	"
+	${sudo} mkdir -p "${rootfs}/etc/dropbear"
+
+	if [[ ${#server_keys[@]} -gt 0 ]]; then
+		${sudo} cp -af ${server_keys[@]} "${rootfs}/etc/dropbear/"
+	else
+		enter_chroot "${rootfs}" "
+			set -e
+			/usr/bin/dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key
+			/usr/bin/dropbearkey -t dss -f /etc/dropbear/dropbear_dss_host_key
+			/usr/bin/dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key
+		"
+	fi
 
 	#echo "${script_name}: USER=@$(id --user --real --name)@" >&2
 	${sudo} cp -f "${rootfs}/etc/dropbear/dropbear_rsa_host_key" "${srv_key}"
