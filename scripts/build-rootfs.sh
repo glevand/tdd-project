@@ -524,7 +524,7 @@ process_opts "${@}"
 
 if [[ ${config_file} ]]; then
 	check_file "${config_file}" ' config file' 'usage'
-	config_dir="${config_file%/*}"
+	export config_dir="${config_file%/*}"
 	source "${config_file}"
 fi
 
