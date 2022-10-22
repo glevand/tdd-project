@@ -186,7 +186,7 @@ setup_sshd() {
 	${sudo} mkdir -p "${rootfs}/etc/dropbear"
 
 	if [[ ${#server_keys[@]} -gt 0 ]]; then
-		${sudo} cp -af ${server_keys[@]} "${rootfs}/etc/dropbear/"
+		${sudo} cp -af "${server_keys[@]}" "${rootfs}/etc/dropbear/"
 	else
 		enter_chroot "${rootfs}" "
 			set -e
