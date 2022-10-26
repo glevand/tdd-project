@@ -7,6 +7,9 @@
 # Home: @PACKAGE_URL@"
 #
 
+script_name="${script_name:?}"
+debootstrap="${debootstrap:-debootstrap}"
+
 debug_check() {
 	local info=${1}
 
@@ -25,6 +28,10 @@ debug_check() {
 
 bootstrap_rootfs() {
 	local rootfs=${1}
+
+	if ! check_prog "${debootstrap}"; then
+		exit 1
+	fi
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
@@ -62,8 +69,8 @@ bootstrap_rootfs() {
 
 	${sudo} chown root: "${rootfs}/"
 
-	(${sudo} debootstrap --foreign --arch "${debian_arch}" --no-check-gpg \
-		"${debootstrap_extra}" \
+	(${sudo} "${debootstrap}" --foreign --arch "${debian_arch}" --no-check-gpg \
+		${debootstrap_extra} \
 		"${debian_os_release}" "${rootfs}" "${debian_os_mirror}")
 
 	stat "${rootfs}/" "${rootfs}/dev" "${rootfs}/var" || :

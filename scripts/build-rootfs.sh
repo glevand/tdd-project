@@ -522,6 +522,7 @@ declare -a server_keys
 
 process_opts "${@}"
 
+# shellcheck source=rootfs-plugin/build-rootfs.conf.alpine-sample
 if [[ ${config_file} ]]; then
 	check_file "${config_file}" ' config file' 'usage'
 	export config_dir="${config_file%/*}"
