@@ -1,0 +1,29 @@
+# Sample TDD build-rootfs configuration file.
+# https://github.com/glevand/tdd-project
+#
+
+target_arch='amd64'
+rootfs_type='coreos'
+minimal_install='1'
+target_hostname='tdd-tester'
+verbose='1'
+kernel_modules='none'
+
+network_config='
+auto eth0
+iface eth0 inet static
+        address 11.22.33.44/22
+        gateway 11.22.33.1
+
+auto eth1
+iface eth1 inet dhcp
+'
+
+m_of_the_day='Welcome to the TDD CoreOS Container Linux boot image.
+'
+
+server_keys=(
+	"${config_dir}/dropbear/dropbear_rsa_host_key"
+	"${config_dir}/dropbear/dropbear_dss_host_key"
+	"${config_dir}/dropbear/dropbear_ecdsa_host_key"
+)
