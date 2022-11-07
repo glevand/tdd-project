@@ -186,7 +186,7 @@ setup_sshd() {
 	${sudo} mkdir -p "${rootfs}/etc/dropbear"
 
 	if [[ ${#server_keys[@]} -gt 0 ]]; then
-		${sudo} cp -af "${server_keys[@]}" "${rootfs}/etc/dropbear/"
+		${sudo} cp -avf "${server_keys[@]}" "${rootfs}/etc/dropbear/"
 	else
 		enter_chroot "${rootfs}" "
 			set -e
@@ -196,9 +196,9 @@ setup_sshd() {
 		"
 	fi
 
-	#echo "${script_name}: USER=@$(id --user --real --name)@" >&2
-	${sudo} cp -f "${rootfs}/etc/dropbear/dropbear_rsa_host_key" "${srv_key}"
-	${sudo} chown "$(id --user --real --name)": "${srv_key}"
+	echo "${script_name}: USER=@$(id --user --real --name)@" >&2
+	# ${sudo} cp -f "${rootfs}/etc/dropbear/dropbear_rsa_host_key" "${srv_key}"
+	# ${sudo} chown "$(id --user --real --name)": "${srv_key}"
 
 	#echo 'DROPBEAR_OPTS=""' | sudo_write ${rootfs}/etc/conf.d/dropbear
 }
