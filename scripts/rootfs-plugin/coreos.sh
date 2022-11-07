@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+#
 # CoreOS plug-in routines for build-rootfs.sh.
 #
 # @PACKAGE_NAME@ ${script_name}"
@@ -5,21 +7,59 @@
 # Home: @PACKAGE_URL@"
 #
 
+script_name="${script_name:?}"
+coreos_installer="${coreos-installer:-coreos-installer}"
+
+debug_check() {
+	local info=${1}
+
+	if [[ ${verbose} ]]; then
+	{
+		echo "debug_check: vvvvv (${info}) vvvvvvvvvvvvvvvvvvvv"
+		set +e
+		${sudo} true
+		mount
+		${sudo} ls -l '/var/run/sudo/ts'
+		set -e
+		echo "debug_check: ^^^^^ (${info}) ^^^^^^^^^^^^^^^^^^^^"
+	} >&2
+	fi
+}
+
 bootstrap_rootfs() {
 	local rootfs=${1}
+
+# 	if ! check_prog "${coreos_installer}"; then
+# 		exit 1
+# 	fi
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
 	case ${target_arch} in
 	amd64)
-		debian_arch="amd64"
-		debian_os_release=${debian_os_release:-"buster"}
-		debian_os_mirror=${debian_os_mirror:-"http://ftp.us.debian.org/debian"}
+		coreos_arch='amd64'
+		coreos_os_release="${coreos_os_release:-???}"
+		coreos_os_mirror="${coreos_os_mirror:-http://ftp.us.coreos.org/coreos}"
+		coreos_installer_extra=''
+		;;
+	arm32)
+		coreos_arch='armel'
+# 		coreos_arch='armhf'
+		coreos_os_release="${coreos_os_release:-???}"
+		coreos_os_mirror="${coreos_os_mirror:-http://ftp.us.coreos.org/coreos}"
+		coreos_installer_extra=''
 		;;
 	arm64)
-		debian_arch="arm64"
-		debian_os_release=${debian_os_release:-"buster"}
-		debian_os_mirror=${debian_os_mirror:-"http://ftp.us.debian.org/debian"}
+		coreos_arch='arm64'
+		coreos_os_release="${coreos_os_release:-???}"
+		coreos_os_mirror="${coreos_os_mirror:-http://ftp.us.coreos.org/coreos}"
+		coreos_installer_extra=''
+		;;
+	ppc32|ppc64)
+		coreos_arch='powerpc'
+		coreos_os_release="${coreos_os_release:-???}"
+		coreos_os_mirror="${coreos_os_mirror:-http://ftp.ports.coreos.org/coreos-ports}"
+		coreos_installer_extra='--include=coreos-ports-archive-keyring --exclude=powerpc-ibm-utils,powerpc-utils,vim-tiny'
 		;;
 	*)
 		echo "${script_name}: ERROR: Unsupported target-arch '${target_arch}'." >&2
@@ -27,42 +67,57 @@ bootstrap_rootfs() {
 		;;
 	esac
 
-	(${sudo} debootstrap --foreign --arch ${debian_arch} --no-check-gpg \
-		${debootstrap_extra} \
-		${debian_os_release} ${rootfs} ${debian_os_mirror})
+	${sudo} chown root: "${rootfs}/"
+
+	(${sudo} "${coreos_installer}" --foreign --arch "${coreos_arch}" --no-check-gpg \
+		${coreos_installer_extra} \
+		"${coreos_os_release}" "${rootfs}" "${coreos_os_mirror}")
+
+	stat "${rootfs}/" "${rootfs}/dev" "${rootfs}/var" || :
+
+	cat "${rootfs}/etc/apt/sources.list" || :
+	cat "${rootfs}/etc/apt/sources.list.d/"* || :
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
-	copy_qemu_static ${rootfs}
+	copy_qemu_static "${rootfs}"
 
 	${sudo} mount -l -t proc
-	${sudo} ls -la ${rootfs}
-	${sudo} find ${rootfs} -type l -exec ls -la {} \; | grep ' -> /'
-	${sudo} rm -f ${rootfs}/proc
-	${sudo} mkdir -p  ${rootfs}/proc
-	${sudo} mount -t proc -o nosuid,nodev,noexec /proc ${rootfs}/proc
-	${sudo} mount -l -t proc
+	${sudo} ls -la "${rootfs}"
+	${sudo} find "${rootfs}" -type l -exec ls -la {} \; | grep ' -> /'
 
-	${sudo} LANG=C.UTF-8 chroot ${rootfs} /bin/sh -x <<EOF
-/debootstrap/debootstrap --second-stage
+	setup_chroot_mounts "${rootfs}"
+
+	${sudo} LANG=C.UTF-8 chroot "${rootfs}" /bin/sh -x <<EOF
+/coreos_installer/coreos_installer --second-stage
 EOF
 
-	${sudo} mount -l -t proc
-	${sudo} umount ${rootfs}/proc || :
-	${sudo} mount -l -t proc
-
-	clean_qemu_static ${rootfs}
+	clean_qemu_static "${rootfs}"
+	clean_chroot_mounts "${rootfs}"
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 
 	${sudo} sed --in-place 's/$/ contrib non-free/' \
-		${rootfs}/etc/apt/sources.list
+		"${rootfs}/etc/apt/sources.list"
 
-	enter_chroot ${rootfs} "
-		export DEBIAN_FRONTEND=noninteractive
-		apt-get update
+	enter_chroot "${rootfs}" "
+		DEBIAN_FRONTEND=noninteractive apt-get update
+		DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
 	"
 
+	debug_check "${FUNCNAME[0]}:${LINENO}"
+}
+
+setup_packages() {
+	local rootfs=${1}
+	shift 1
+	local packages="${*//,/ }"
+
+	debug_check "${FUNCNAME[0]}:${LINENO}"
+
+	enter_chroot "${rootfs}" "
+		DEBIAN_FRONTEND=noninteractive apt-get -y install ${packages}
+	"
 	debug_check "${FUNCNAME[0]}:${LINENO}"
 }
 
@@ -70,29 +125,11 @@ rootfs_cleanup() {
 	local rootfs=${1}
 
 	debug_check "${FUNCNAME[0]}:${LINENO}"
-	enter_chroot ${rootfs} "
-		export DEBIAN_FRONTEND=noninteractive
-		apt-get -y autoremove
+	enter_chroot "${rootfs}" "
+		DEBIAN_FRONTEND=noninteractive apt-get -y clean
 		rm -rf /var/lib/apt/lists/*
 	"
 	debug_check "${FUNCNAME[0]}:${LINENO}"
-}
-
-setup_packages() {
-	local rootfs=${1}
-	shift 1
-	local packages="${@//,/ }"
-
-	debug_check "${FUNCNAME[0]}:${LINENO}"
-
-	enter_chroot ${rootfs} "
-		export DEBIAN_FRONTEND=noninteractive
-		apt-get update
-		apt-get -y upgrade
-		apt-get -y install ${packages}
-	"
-	debug_check "${FUNCNAME[0]}:${LINENO}"
-
 }
 
 setup_initrd_boot() {
@@ -102,25 +139,25 @@ setup_initrd_boot() {
 	${sudo} cp -a "${rootfs}/etc/os-release" "${rootfs}/etc/initrd-release"
 }
 
-setup_network() {
-	local rootfs=${1}
-
-	setup_network_systemd ${rootfs}
-}
-
 setup_login() {
 	local rootfs=${1}
 	local pw=${2}
 
-	setup_password ${rootfs} ${pw}
+	setup_password "${rootfs}" "${pw}"
 
 	${sudo} sed --in-place \
 		's|-/sbin/agetty -o|-/sbin/agetty --autologin root -o|' \
-		${rootfs}/lib/systemd/system/serial-getty@.service
+		"${rootfs}/lib/systemd/system/serial-getty@.service"
 
 	${sudo} sed --in-place \
 		's|-/sbin/agetty -o|-/sbin/agetty --autologin root -o|' \
-		${rootfs}/lib/systemd/system/getty@.service
+		"${rootfs}/lib/systemd/system/getty@.service"
+}
+
+setup_network() {
+	local rootfs=${1}
+
+	setup_network_systemd "${rootfs}"
 }
 
 setup_sshd() {
@@ -132,7 +169,7 @@ setup_sshd() {
 		local value=${2}
 		
 		${sudo} sed --in-place "s/^${key}.*$//" \
-			${rootfs}/etc/ssh/sshd_config
+			"${rootfs}/etc/ssh/sshd_config"
 		echo "${key} ${value}" | sudo_append "${rootfs}/etc/ssh/sshd_config"
 	}
 
@@ -145,7 +182,7 @@ setup_sshd() {
 		exit 1
 	fi
 
-	${sudo} cp -f ${rootfs}/etc/ssh/ssh_host_rsa_key ${srv_key}
+	${sudo} cp -f "${rootfs}/etc/ssh/ssh_host_rsa_key" "${srv_key}"
 	echo "${script_name}: USER=@$(id --user --real --name)@" >&2
 	#printenv
 	#${sudo} chown $(id --user --real --name): ${srv_key}
@@ -184,36 +221,53 @@ EOF
 #systemd-networkd-wait-online.service: Failed with result 'exit-code'.
 #Startup finished in 16.250s (kernel) + 0 (initrd) + 2min 2.838s (userspace) = 2min 19.089s.
 
-	enter_chroot ${rootfs} "
+	enter_chroot "${rootfs}" "
 		systemctl enable \
 			${tdd_service} \
 			systemd-networkd-wait-online.service \
 	"
 }
 
-get_default_packages() {
-	local default_packages="
+get_packages() {
+	local type=${1}
+
+	local base_packages="
 		haveged
+		openssh-server
+	"
+
+	local extra_packages="
+		efibootmgr
+		file
 		login
 		net-tools
 		netcat-openbsd
-		openssh-server
 		pciutils
 		strace
 		tcpdump
 	"
-	local default_packages_arm64="
-		${default_packages}
-		efibootmgr
-		firmware-qlogic
-		firmware-bnx2x
-	"
 
-	if [[ ${debian_default_packages} ]]; then
-		echo ${debian_default_packages}
-	elif [[ ${target_arch} == "arm64" ]]; then
-		echo ${default_packages_arm64}
-	else
-		echo ${default_packages}
-	fi
+	case "${type}" in
+	'base')
+		str_trim_space "${base_packages}"
+		return
+		;;
+	'all')
+		str_trim_space "${base_packages} ${extra_packages}"
+		return
+		;;
+	*)
+		echo "${FUNCNAME[0]}: ERROR: Bad type: '${type}'" >&2
+		exit 1
+		;;
+	esac
 }
+
+get_base_packages() {
+	get_packages 'base'
+}
+
+get_all_packages() {
+	get_packages 'all'
+}
+
