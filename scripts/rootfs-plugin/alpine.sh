@@ -46,7 +46,12 @@ download_minirootfs() {
 	fi
 
 	latest="${latest##* }"
-	wget "${base_url}/${latest}"
+
+	if [[ -f "${download_dir}/${latest}" ]]; then
+		echo "${script_name}: INFO: Using cached file '${download_dir}/${latest}'." >&2
+	else
+		wget "${base_url}/${latest}"
+	fi
 
 	popd || exit 1
 
@@ -66,7 +71,7 @@ extract_minirootfs() {
 bootstrap_rootfs() {
 	local bootstrap_dir=${1}
 
-	local download_dir="${tmp_dir}/downloads"
+	local download_dir="${cache_dir}"
 	local archive_file
 
 # 	delete_dir "${bootstrap_dir:?}"

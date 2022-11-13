@@ -567,6 +567,8 @@ cleanup_chroot "${rootfs_dir}"
 cleanup_chroot "${bootstrap_dir}"
 
 tmp_dir="$(mktemp --tmpdir --directory "${script_name}".XXXX)"
+cache_dir="/tmp/${script_name}.cache"
+
 need_clean_rootfs=''
 
 if [[ ${step_bootstrap} ]]; then
