@@ -1,127 +1,150 @@
 #!/usr/bin/env bash
 
-set -e
-
-script_name="${0##*/}"
-
-real_source="$(realpath "${BASH_SOURCE}")"
-SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
-
-source "${SCRIPT_TOP}/tdd-lib/util.sh"
-
 usage() {
 	local old_xtrace
 	old_xtrace="$(shopt -po xtrace || :)"
 	set +o xtrace
 
-	if [[ -z ${password} ]]; then
-		local p
-	else
-		local p='*******'
+	local p=''
+
+	if [[ ${password} ]]; then
+		p='*******'
 	fi
-	
-	echo "${script_name} - Adds a TDD jenkins user to system." >&2
-	echo "Usage: ${script_name} [flags]" >&2
-	echo "Option flags:" >&2
-	echo "  -c --check    - Only run checks then exit." >&2
-	echo "  -d --delete   - Delete user '${user}' from system." >&2
-	echo "  -e --home     - home. Default: '${home}'." >&2
-	echo "  -g --gid      - GID. Default: '${gid}'." >&2
-	echo "  -h --help     - Show this help and exit." >&2
-	echo "  -n --np-sudo  - Setup NOPASSWD sudo. Default: '${np_sudo}'." >&2
-	echo "  -p --group    - Group. Default: '${group}'." >&2
-	echo "  -r --user     - User. Default: '${user}'." >&2
-	echo "  -s --sudo     - Setup sudo. Default: '${sudo}'." >&2
-	echo "  -u --uid      - UID. Default: '${uid}'." >&2
-	echo "  -w --password - Account password. Default: '${p}'." >&2
-	echo "Environment:" >&2
-	echo "  JENKINS_USER - Default: '${JENKINS_USER}'" >&2
+
+	{
+		echo "${script_name} - Adds a TDD jenkins user to the system."
+		echo "Usage: ${script_name} [flags]"
+		echo "Option flags:"
+		echo "  -c --check    - Only run checks then exit."
+		echo "  -d --delete   - Delete user '${user}' from system."
+		echo "  -e --home     - home. Default: '${home}'."
+		echo "  -g --gid      - GID. Default: '${gid}'."
+		echo "  -n --np-sudo  - Setup NOPASSWD sudo. Default: '${np_sudo}'."
+		echo "  -p --group    - Group. Default: '${group}'."
+		echo "  -r --user     - User. Default: '${user}'."
+		echo "  -s --sudo     - Setup sudo. Default: '${sudo}'."
+		echo "  -u --uid      - UID. Default: '${uid}'."
+		echo "  -w --password - Account password. Default: '${p}'."
+		echo "  -h --help     - Show this help and exit."
+		echo "  -v --verbose  - Verbose execution. Default: '${verbose}'."
+		echo "  -x --debug    - Extra verbose execution. Default: '${debug}'."
+		echo "Environment:"
+		echo "  JENKINS_USER - Default: '${JENKINS_USER}'"
+		echo "Info:"
+		print_project_info
+	} >&2
 	eval "${old_xtrace}"
 }
 
-short_opts="cde:g:hnp:r:su:w:"
-long_opts="check,delete,home:,gid:,help,np-sudo,group:,user:,sudo,uid:,password:"
-opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
+process_opts() {
+	local short_opts='cde:g:np:r:su:w:lhvx'
+	local long_opts='check,delete,home:,gid:,np-sudo,group:,user:,sudo,uid:,password:,help,verbose,debug'
 
-if [ $? != 0 ]; then
-	echo "${script_name}: ERROR: Internal getopt" >&2
-	exit 1
-fi
+	local opts
+	opts=$(getopt --options ${short_opts} --long ${long_opts} -n "${script_name}" -- "$@")
 
-eval set -- "${opts}"
+	eval set -- "${opts}"
 
-while true ; do
-	case "${1}" in
-	-c | --check)
-		check=1
-		shift
-		;;
-	-d | --delete)
-		delete=1
-		shift
-		;;
-	-e | --home)
-		home="${2}"
-		shift 2
-		;;
-	-g | --gid)
-		gid="${2}"
-		shift 2
-		;;
-	-h | --help)
-		usage=1
-		shift
-		;;
-	-n | --np-sudo)
-		np_sudo=1
-		shift
-		;;
-	-p | --group)
-		group="${2}"
-		shift 2
-		;;
-	-r | --user)
-		user="${2}"
-		shift 2
-		;;
-	-s | --sudo)
-		sudo=1
-		shift
-		;;
-	-u | --uid)
-		uid="${2}"
-		shift 2
-		;;
-	-w | --password)
-		password="${2}"
-		shift 2
-		;;
-	--)
-		shift
-		break
-		;;
-	*)
-		echo "${script_name}: ERROR: Internal opts: '${@}'" >&2
-		exit 1
-		;;
-	esac
-done
+	while true ; do
+		# echo "${FUNCNAME[0]}: (${#}) '${*}'"
+		case "${1}" in
+		-c | --check)
+			check=1
+			shift
+			;;
+		-d | --delete)
+			delete=1
+			shift
+			;;
+		-e | --home)
+			home="${2}"
+			shift 2
+			;;
+		-g | --gid)
+			gid="${2}"
+			shift 2
+			;;
+		-n | --np-sudo)
+			np_sudo=1
+			shift
+			;;
+		-p | --group)
+			group="${2}"
+			shift 2
+			;;
+		-r | --user)
+			user="${2}"
+			shift 2
+			;;
+		-s | --sudo)
+			sudo=1
+			shift
+			;;
+		-u | --uid)
+			uid="${2}"
+			shift 2
+			;;
+		-w | --password)
+			password="${2}"
+			shift 2
+			;;
+		-h | --help)
+			usage=1
+			shift
+			;;
+		-v | --verbose)
+			verbose=1
+			shift
+			;;
+		-x | --debug)
+			verbose=1
+			debug=1
+			set -x
+			shift
+			;;
+		--)
+			shift
+			extra_args="${*}"
+			break
+			;;
+		*)
+			echo "${script_name}: ERROR: Internal opts: '${*}'" >&2
+			exit 1
+			;;
+		esac
+	done
+}
 
-user=${user:-"${JENKINS_USER}"}
-user=${user:-'tdd-jenkins'}
-uid=${uid:-"5522"}
+print_project_banner() {
+	echo "${script_name} (@PACKAGE_NAME@) - ${start_time}"
+}
 
-home=${home:-"/home/${user}"}
-group=${group:-"${user}"}
-gid=${gid:-"${uid}"}
+print_project_info() {
+	echo "  @PACKAGE_NAME@ ${script_name}"
+	echo "  Version: @PACKAGE_VERSION@"
+	echo "  Project Home: @PACKAGE_URL@"
+}
 
-if [[ -n "${usage}" ]]; then
-	usage
-	exit 0
-fi
+on_exit() {
+	local result=${1}
+
+	local sec="${SECONDS}"
+
+	set +x
+	echo "${script_name}: Done: ${result}, ${sec} sec." >&2
+}
+
+on_err() {
+	local f_name=${1}
+	local line_no=${2}
+	local err_no=${3}
+
+	echo "${script_name}: ERROR: function=${f_name}, line=${line_no}, result=${err_no}"
+	exit "${err_no}"
+}
 
 run_checks() {
-	local result
+	local result=''
 	local check_msg
 
 	if [[ ${check} ]]; then
@@ -130,15 +153,15 @@ run_checks() {
 		check_msg='ERROR'
 	fi
 
-	if getent passwd ${user} &> /dev/null; then
+	if getent passwd "${user}" &> /dev/null; then
 		echo "${script_name}: ${check_msg}: user '${user}' exists." >&2
-		echo "${script_name}: ${check_msg}: => $(id ${user})" >&2
+		echo "${script_name}: ${check_msg}: => $(id "${user}")" >&2
 		result=1
 	else
 		echo "${script_name}: INFO: user '${user}' does not exist." >&2
 	fi
 
-	if getent group ${uid} &> /dev/null; then
+	if getent group "${uid}" &> /dev/null; then
 		echo "${script_name}: ${check_msg}: uid ${uid} exists." >&2
 		result=1
 	else
@@ -152,21 +175,21 @@ run_checks() {
 		echo "${script_name}: INFO: home '${home}' does not exist." >&2
 	fi
 
-	if getent group ${group} &> /dev/null; then
+	if getent group "${group}" &> /dev/null; then
 		echo "${script_name}: ${check_msg}: group '${group}' exists." >&2
 		result=1
 	else
 		echo "${script_name}: INFO: group '${group}' does not exist." >&2
 	fi
 
-	if getent group ${gid} &> /dev/null; then
+	if getent group "${gid}" &> /dev/null; then
 		echo "${script_name}: ${check_msg}: gid ${gid} exists." >&2
 		result=1
 	else
 		echo "${script_name}: INFO: gid ${gid} does not exist." >&2
 	fi
 
-	if [[ -f /etc/sudoers.d/${user} ]]; then
+	if [[ -f "/etc/sudoers.d/${user}" ]]; then
 		echo "${script_name}: ${check_msg}: sudoers '/etc/sudoers.d/${user}' exists." >&2
 		result=1
 	else
@@ -182,50 +205,115 @@ run_checks() {
 	return 0
 }
 
-if [[ ${delete} ]]; then
-	set -x
-	
-	userdel ${user}
-	rm -rf ${home}
-	rm -f /etc/sudoers.d/${user}
+#===============================================================================
+export PS4='\[\e[0;33m\]+ ${BASH_SOURCE##*/}:${LINENO}:(${FUNCNAME[0]:-main}):\[\e[0m\] '
 
+script_name="${0##*/}"
+
+SECONDS=0
+start_time="$(date +%Y.%m.%d-%H.%M.%S)"
+
+real_source="$(realpath "${BASH_SOURCE[0]}")"
+SCRIPT_TOP="$(realpath "${SCRIPT_TOP:-${real_source%/*}}")"
+
+trap "on_exit 'Failed'" EXIT
+trap 'on_err ${FUNCNAME[0]:-main} ${LINENO} ${?}' ERR
+trap 'on_err SIGUSR1 ? 3' SIGUSR1
+
+set -eE
+set -o pipefail
+set -o nounset
+
+# shellcheck source=scripts/tdd-lib/util.sh
+source "${SCRIPT_TOP}/tdd-lib/util.sh"
+
+check=''
+delete=''
+home=''
+gid=''
+np_sudo=''
+group=''
+user=''
+sudo=''
+uid=''
+password=''
+usage=''
+verbose=''
+debug=''
+
+process_opts "${@}"
+
+JENKINS_USER="${JENKINS_USER:-}"
+user="${user:-${JENKINS_USER}}"
+user="${user:-tdd-jenkins}"
+uid="${uid:-5522}"
+
+home=${home:-"/home/${user}"}
+group=${group:-"${user}"}
+gid=${gid:-"${uid}"}
+
+if [[ ${usage} ]]; then
+	usage
+	trap - EXIT
 	exit 0
 fi
 
-result=$(run_checks)
+print_project_banner >&2
 
-if [[ ${result} ]]; then
+if [[ ${extra_args} ]]; then
+	set +o xtrace
+	echo "${script_name}: ERROR: Got extra args: '${extra_args}'" >&2
+	usage
+	exit 1
+fi
+
+if [[ ${delete} ]]; then
+	set -x
+
+	userdel "${user}"
+	rm -rf "${home}"
+	rm -f "/etc/sudoers.d/${user}"s
+
+	trap $'on_exit "Success"' EXIT
+	exit 0
+fi
+
+echo "${script_name}: NOTE: A seperate TDD jenkins user is no longer needed." >&2
+trap - EXIT
+exit 0
+
+if ! run_checks; then
 	exit 1
 fi
 
 if [[ ${check} ]]; then
+	trap $'on_exit "Success"' EXIT
 	exit 0
 fi
 
-set -x
+sudo true
 
-groupadd --gid=${gid} ${group}
-useradd --create-home --home-dir=${home} \
-	--uid=${uid} --gid=${gid} --groups='docker'  \
-	--shell=/bin/bash ${user}
+sudo groupadd --gid="${gid}" "${group}"
+
+sudo useradd --create-home --home-dir="${home}" \
+	--uid="${uid}" --gid="${gid}" --groups='docker'  \
+	--shell='/bin/bash' "${user}"
 
 if [[ ${sudo} || ${np_sudo} ]]; then
-	usermod --append --groups='sudo' ${user}
+	sudo usermod --append --groups='sudo' "${user}"
 fi
 
 if [[ ${np_sudo} ]]; then
-	echo "%${user} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${user}
-fi
-
-if [[ ${no_lecture} ]]; then # TODO
-	echo 'Defaults lecture = never' > /etc/sudoers.d/lecture
+	echo "%${user} ALL=(ALL) NOPASSWD:ALL" | sudo_write "/etc/sudoers.d/${user}"
 fi
 
 old_xtrace="$(shopt -po xtrace || :)"
 set +o xtrace
-if [[ -n ${password} ]]; then
-	echo "${user}:${password}" | chpasswd
+if [[ ${password} ]]; then
+	echo "${user}:${password}" | sudo chpasswd
 fi
 eval "${old_xtrace}"
 
-echo "${script_name}: INFO: Done OK." >&2
+trap $'on_exit "Success"' EXIT
+exit 0
+
