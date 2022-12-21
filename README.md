@@ -69,7 +69,7 @@ server container images can also be built from provided
 [Dockerfiles](https://github.com/glevand/tdd--docker/tree/master/jenkins).
 
 For setup see the TDD Jenkins service
-[README](https://github.com/glevand/tdd--docker/blob/master/jenkins/README.md)
+[README](https://github.com/glevand/tdd--docker/blob/master/tdd-jenkins/README.md)
 and the [Container and Service Setup](#container-and-service-setup) section of
 this document.
 
@@ -161,7 +161,7 @@ The
 script will bulid all the TDD containers and can also install and enable the
 systemd services of those containers that have them.  Individual containers and
 services can be build and/or setup with the container's build script,
-[build-jenkins.sh](https://github.com/glevand/tdd--docker/blob/master/jenkins/build-jenkins.sh)
+[build-jenkins.sh](https://github.com/glevand/tdd--docker/blob/master/tdd-jenkins/build-jenkins.sh)
 for example.
 
 ## Trouble-shooting
