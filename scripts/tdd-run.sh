@@ -623,7 +623,7 @@ if [[ ${linux_source} ]]; then
 	linux_src_dir="${linux_source}"
 else
 	linux_repo=${linux_repo:-"https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git"}
-	linux_branch=${linux_branch:-"linux-5.14.y"}
+	linux_branch=${linux_branch:-"master"}
 	linux_src_dir=${linux_src_dir:-"${top_build_dir}/$(git_get_repo_name ${linux_repo})"}
 fi
 
