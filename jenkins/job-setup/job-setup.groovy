@@ -1,8 +1,8 @@
 /*
- * Create TDD CI jobs on a Jenkins server.
+ * Create TDD jobs on a Jenkins server.
  *
  * This entire script can be pasted directly into the text box found at
- * ${JENKINS_URL}/script to populate the server with jobs
+ * ${JENKINS_URL}/manage/script to populate the server with jobs.
  *
  * Note that settings such as user permissions and secret credentials
  * are not handled by this script.
@@ -10,9 +10,9 @@
 
 final String REPO_URL = 'https://github.com/glevand/tdd-project.git'
 final String REPO_JOB_PATH = 'jenkins/jobs'
-final String REPO_BRANCH = 'dev'
-final String BASE_FOLDER = 'tdd-dev'
-\
+final String REPO_BRANCH = 'master'
+final String BASE_FOLDER = 'tdd-project'
+
 /*
  * Create a new folder project under the given parent model.
  */
@@ -115,13 +115,13 @@ def jobs = [
         description: 'Polls linux-next for changes.  Builds kernel and runs a boot test in QEMU.',
         script: '/kernel/linux-next-trigger.groovy',
         folder: f_kernel],
-    4: [name: 'linux-4.19.y-stable-trigger',
+    4: [name: 'linux-5.15.y-stable-trigger',
         description: 'Polls linux-stable for changes.  Builds kernel and runs a boot test in QEMU.',
-        script: '/kernel/linux-4.19.y-stable-trigger.groovy',
+        script: '/kernel/linux-5.15.y-stable-trigger.groovy',
         folder: f_kernel],
-    5: [name: 'linux-4.20.y-stable-trigger',
+    5: [name: 'linux-6.1.y-stable-trigger',
         description: 'Polls linux-stable for changes.  Builds kernel and runs a boot test in QEMU.',
-        script: '/kernel/linux-4.20.y-stable-trigger.groovy',
+        script: '/kernel/linux-6.1.y-stable-trigger.groovy',
         folder: f_kernel],
     6: [name: 'f29-installer-test',
         description: 'Test of latest Fedora 29 pxeboot installer.',
