@@ -369,7 +369,7 @@ set_target_variables() {
 		target_copy=(
 			vmlinux boot/
 			arch/powerpc/boot/otheros.bld boot/
-			arch/powerpc/boot/dtbImage.ps3.bin boot/linux
+			arch/powerpc/boot/dtbImage.ps3.bin boot/
 		)
 		target_copy_extra=()
 		target_ops='defaults'
