@@ -329,34 +329,41 @@ fi
 case "${host_arch}--${target_arch}" in
 amd64--amd64)
 	have_efi=1
-	qemu_exe="qemu-system-x86_64"
-	qemu_args+=" -machine accel=kvm -cpu host -m 8192 -smp 2"
-	qemu_args+=" -device i6300esb,id=watchdog0 -watchdog-action reset"
+	qemu_exe='qemu-system-x86_64='
+	qemu_args+=' -machine accel=kvm -cpu host -m 8192 -smp 2='
+	qemu_args+=' -device i6300esb,id=watchdog0 -watchdog-action reset='
 	;;
 arm64--amd64)
 	have_efi=1
-	qemu_exe="qemu-system-x86_64"
-	qemu_args+=" -machine pc-q35-2.8 -cpu kvm64 -m 8192 -smp 2"
+	qemu_exe='qemu-system-x86_64='
+	qemu_args+=' -machine pc-q35-2.8 -cpu kvm64 -m 8192 -smp 2='
 	;;
 amd64--arm64)
 	have_efi=1
-	qemu_exe="qemu-system-aarch64"
-	#qemu_mem=${qemu_mem:-5120} # 5G
-	qemu_mem=${qemu_mem:-6144} # 6G
-	#qemu_mem=${qemu_mem:-16384} # 16G
-	qemu_args+=" -machine virt,gic-version=3 -cpu cortex-a57 -m ${qemu_mem} -smp 2"
+	qemu_exe='qemu-system-aarch64='
+	#qemu_mem="${qemu_mem:-5120}" # 5G
+	qemu_mem="${qemu_mem:-6144}" # 6G
+	#qemu_mem="${qemu_mem:-16384}" # 16G
+	qemu_args+=' -machine virt,gic-version=3 -cpu cortex-a57 -m ${qemu_mem} -smp 2='
 	;;
 arm64--arm64)
 	have_efi=1
-	qemu_exe="qemu-system-aarch64"
-	qemu_args+=" -machine virt,gic-version=3,accel=kvm -cpu host -m 4096 -smp 2"
+	qemu_exe='qemu-system-aarch64='
+	qemu_args+=' -machine virt,gic-version=3,accel=kvm -cpu host -m 4096 -smp 2='
 	;;
-amd64--ppc*)
-	unset have_efi
-	qemu_exe="qemu-system-ppc64"
-	#qemu_args+=" -machine cap-htm=off -m 8192"
-	#qemu_args+=" -machine pseries,cap-htm=off -m 8192"
-	qemu_args+=" -machine pseries,cap-htm=off -m 8192 -append 'root=/dev/ram0 console=hvc0'"
+amd64--ppc32)
+	have_efi=''
+	qemu_exe='qemu-system-ppc'
+	qemu_args+=' -machine g3beige -m 2047'
+	kernel_cmd+=' root=/dev/ram0 console=hvc0'
+	;;
+amd64--ppc64)
+	have_efi=''
+	qemu_exe='qemu-system-ppc64='
+	#qemu_args+=' -machine cap-htm=off -m 8192='
+	#qemu_args+=' -machine pseries,cap-htm=off -m 8192='
+	qemu_args+=' -machine pseries,cap-htm=off -m 8192='
+	kernel_cmd+=' root=/dev/ram0 console=hvc0'
 	;;
 *)
 	echo "${script_name}: ERROR: Unsupported host--target combo: '${host_arch}--${target_arch}'." >&2
