@@ -58,7 +58,7 @@ local-version:,toolchain-prefix:,vbuild,help,verbose,debug"
 			target="${2}"
 			shift 2
 			;;
-		-s | --kernel-src)
+		-k | --kernel-src)
 			kernel_src="${2}"
 			shift 2
 			;;
