@@ -245,7 +245,6 @@ get_packages() {
 	local type=${1}
 
 	local base_packages="
-		busybox-initscripts
 		dropbear
 		haveged
 		openrc
