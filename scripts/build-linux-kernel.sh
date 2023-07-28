@@ -165,9 +165,14 @@ on_exit() {
 
 	local color
 	local word
+	local image_size=''
+
 	if [[ ${result} -eq 0 ]]; then
 		color="${ansi_green}"
 		word="OK"
+		if [[ ${print_size}  && -f "${install_dir}/boot/bzImage" ]]; then
+			image_size="$(du -h "${install_dir}/boot/bzImage" | cut -f1)"
+		fi
 	else
 		color="${ansi_red}"
 		word="failed"
@@ -185,6 +190,9 @@ on_exit() {
 		echo "${script_name}: install_dir:   '${install_dir}'"
 		echo "${script_name}: local_version: '${local_version}'"
 		echo "${script_name}: kernel_rev:    '${kernel_rev}'"
+		if [[ ${image_size} ]]; then
+			echo "${script_name}: image_size:    '${image_size}'"
+		fi
 		echo "${script_name}: make_options:  ${make_options}"
 		echo "${script_name}: start_time:    ${start_time}"
 		echo "${script_name}: end_time:      ${end_time}"
@@ -569,22 +577,28 @@ cd "${kernel_src}"
 
 tmp_dir="$(mktemp --tmpdir --directory "${script_name}.XXXX")"
 
+print_size=''
+
 case "${op}" in
 all)
+	print_size=1
 	run_make_fresh
 	run_make_target_ops
 	run_install_image
 	run_install_modules
 	;;
 all-no-mod)
+	print_size=1
 	run_make_fresh
 	run_make_target_ops
 	run_install_image
 	;;
 build|targets)
+	print_size=1
 	run_make_target_ops
 	;;
 build-install)
+	print_size=1
 	run_make_target_ops
 	run_install_image
 	run_install_modules
@@ -598,6 +612,7 @@ defconfig)
 	eval "${make_cmd} ${make_options} savedefconfig"
 	;;
 fresh)
+	print_size=1
 	run_make_fresh
 	;;
 help)
@@ -609,16 +624,20 @@ headers)
 	run_cmd_tee "${make_cmd} ${make_options} prepare"
 	;;
 image_install)
+	print_size=1
 	run_install_image
 	;;
 install)
+	print_size=1
 	run_install_image
 	run_install_modules
 	;;
 modules_install)
+	print_size=1
 	run_install_modules
 	;;
 rebuild)
+	print_size=1
 	eval "${make_cmd} ${make_options} clean"
 	run_make_target_ops
 	;;
