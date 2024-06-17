@@ -38,20 +38,20 @@ bootstrap_rootfs() {
 	case ${target_arch} in
 	amd64)
 		debian_arch='amd64'
-		debian_os_release="${debian_os_release:-bullseye}"
+		debian_os_release="${debian_os_release:-bookworm}"
 		debian_os_mirror="${debian_os_mirror:-http://ftp.us.debian.org/debian}"
 		debootstrap_extra=''
 		;;
 	arm32)
 		debian_arch='armel'
 # 		debian_arch='armhf'
-		debian_os_release="${debian_os_release:-bullseye}"
+		debian_os_release="${debian_os_release:-bookworm}"
 		debian_os_mirror="${debian_os_mirror:-http://ftp.us.debian.org/debian}"
 		debootstrap_extra=''
 		;;
 	arm64)
 		debian_arch='arm64'
-		debian_os_release="${debian_os_release:-bullseye}"
+		debian_os_release="${debian_os_release:-bookworm}"
 		debian_os_mirror="${debian_os_mirror:-http://ftp.us.debian.org/debian}"
 		debootstrap_extra=''
 		;;
